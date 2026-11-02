@@ -119,17 +119,37 @@ def build_model(case):
         rules[k] = dict(rules[k], value=v, source="案件檔覆寫", status=None)
 
     m = Model()
-    site = case["site"]
-    inputs = [  # (key, label, value, unit)
-        ("site_area", "基地面積（謄本）", site["area_m2"], "㎡"),
+    site = case.get("site") or {}
+    params = []
+    parcels = case.get("parcels") or []
+    if parcels:
+        # 多筆地號：面積相加，建蔽率、容積率以面積加權
+        for i, pc in enumerate(parcels):
+            name = pc.get("land_no") or f"地號{i + 1}"
+            src = pc.get("source") or "案件輸入"
+            for key, label, val, unit in ((f"p{i}_area", "面積", pc.get("area_m2"), "㎡"),
+                                          (f"p{i}_cov", "建蔽率", pc.get("coverage_ratio"), ""),
+                                          (f"p{i}_far", "容積率", pc.get("far"), "")):
+                m.const(key, val)
+                params.append((key, f"{name}（{pc.get('zone', '')}）{label}", unit, src, None))
+        n = range(len(parcels))
+        m.expr("site_area", "+".join(f"{{p{i}_area}}" for i in n))
+        m.expr("coverage", "(" + "+".join(f"{{p{i}_area}}*{{p{i}_cov}}" for i in n) + ")/{site_area}")
+        m.expr("far", "(" + "+".join(f"{{p{i}_area}}*{{p{i}_far}}" for i in n) + ")/{site_area}")
+        params += [("site_area", "基地面積合計", "㎡", "各地號相加", None),
+                   ("coverage", "建蔽率（面積加權）", "", "各地號加權", None),
+                   ("far", "容積率（面積加權）", "", "各地號加權", None)]
+        inputs = []
+    else:
+        inputs = [("site_area", "基地面積（謄本）", site["area_m2"], "㎡"),
+                  ("coverage", "建蔽率", site["coverage_ratio"], ""),
+                  ("far", "容積率", site["far"], "")]
+    inputs += [  # (key, label, value, unit)
         ("reserved", "法定保留地", site.get("reserved_m2", 0), "㎡"),
         ("arcade", "騎樓面積", site.get("arcade_m2", 0), "㎡"),
-        ("coverage", "建蔽率", site["coverage_ratio"], ""),
-        ("far", "容積率", site["far"], ""),
-        ("basement_floors", "地下開挖層數", case.get("basement", {}).get("floors", 0), "層"),
-        ("rooftop_floors", "屋突層數", case.get("rooftop", {}).get("floors", 0), "層"),
+        ("basement_floors", "地下開挖層數", (case.get("basement") or {}).get("floors", 0), "層"),
+        ("rooftop_floors", "屋突層數", (case.get("rooftop") or {}).get("floors", 0), "層"),
     ]
-    params = []
     for key, label, val, unit in inputs:
         m.const(key, val)
         params.append((key, label, unit, "案件輸入", None))
@@ -181,28 +201,44 @@ def site_rows(bonuses):
 
 # ---------- 檢查與輸出 ----------
 
+def site_problem(case):
+    """可建量試算做不出來的原因；沒問題回傳 None。"""
+    parcels = case.get("parcels") or []
+    if parcels:
+        for i, pc in enumerate(parcels):
+            name = pc.get("land_no") or f"第 {i + 1} 筆地號"
+            for k, label in (("area_m2", "面積"), ("coverage_ratio", "建蔽率"), ("far", "容積率")):
+                if pc.get(k) in (None, ""):
+                    return f"{name} 缺{label}"
+    else:
+        site = case.get("site") or {}
+        for k, label in (("area_m2", "基地面積"), ("coverage_ratio", "建蔽率"), ("far", "容積率")):
+            if site.get(k) in (None, ""):
+                return f"缺{label}"
+    basement = case.get("basement") or {}
+    if (basement.get("floors", 0) > 0 and basement.get("excavation_ratio") is None
+            and "excavation_tiers" not in load_rules(case.get("city"))):
+        return "這個縣市還沒有開挖率規則，請填開挖率"
+    return None
+
+
 def check(case):
     """回傳 [(table, 可否, 說明)]"""
     floors = case.get("floors") or []
-    basement = case.get("basement") or {}
-    no_excav = (basement.get("floors", 0) > 0 and basement.get("excavation_ratio") is None
-                and "excavation_tiers" not in load_rules(case.get("city")))
-    if no_excav:
-        out = [("site", False, "這個縣市還沒有開挖率規則，請填 basement.excavation_ratio")]
+    problem = site_problem(case)
+    n_parcels = len(case.get("parcels") or [])
+    out = [("site", not problem,
+            problem or (f"{n_parcels} 筆地號合併計算" if n_parcels else "基地面積、容積率、建蔽率齊全"))]
+    if not case.get("building_area_m2"):
+        out.append(("coverage", False, "缺設計建築面積"))
     else:
-        out = [("site", True, "基地面積、容積率、建蔽率齊全")]
-    if case.get("building_area_m2") and no_excav:
-        out.append(("coverage", False, "可建量試算做不出來"))
-    elif case.get("building_area_m2"):
-        out.append(("coverage", True, "有設計建築面積"))
-    else:
-        out.append(("coverage", False, "缺 building_area_m2（設計建築面積）"))
+        out.append(("coverage", not problem, "可建量試算做不出來" if problem else "有設計建築面積"))
     if floors:
-        out.append(("per-floor-volume", True, f"{len(floors)} 層資料，每層一張"))
-        out.append(("summary", not no_excav, "全案一張" if not no_excav else "可建量試算做不出來"))
+        out.append(("per-floor-volume", True, f"{len(floors)} 層資料"))
+        out.append(("summary", not problem, "可建量試算做不出來" if problem else "全案一張"))
     else:
-        out.append(("per-floor-volume", False, "缺 floors（各層面積）"))
-        out.append(("summary", False, "缺 floors（各層面積）"))
+        out.append(("per-floor-volume", False, "缺各層面積"))
+        out.append(("summary", False, "缺各層面積"))
     return out
 
 
@@ -252,6 +288,13 @@ def fmt(v):
 def show(case, tables):
     m, _, layout = compute(case, tables)
     lines = []
+    if case.get("parcels"):
+        lines.append("【地號】")
+        for pc in case["parcels"]:
+            lines.append(f"  {pc.get('land_no', '')}：{fmt(pc['area_m2'])} ㎡　{pc.get('zone', '')}　"
+                         f"建蔽 {pc['coverage_ratio']:.0%}　容積 {pc['far']:.0%}　（{pc.get('source', '案件輸入')}）")
+        lines.append(f"  合計 {fmt(m.value('site_area'))} ㎡　加權建蔽 {m.value('coverage'):.2%}　"
+                     f"加權容積 {m.value('far'):.2%}")
     if "site" in tables:
         lines.append(f"【{TABLES['site']}】")
         for key, label, _, unit, ping in layout["site"]:

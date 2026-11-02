@@ -110,6 +110,7 @@ td.c-pos { color: var(--bad) }
 .err { color: var(--bad); font-size: 13px; margin: 0 }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 12px }
 body[data-target="artifact"] .pages-only { display: none }
+form.multi .single { display: none }
 @media (prefers-reduced-motion: no-preference) { .tile .v { transition: color .2s } }
 </style>
 
@@ -145,15 +146,22 @@ body[data-target="artifact"] .pages-only { display: none }
           <label>縣市<span class="field"><select id="city">
             <option value="taipei">臺北市</option><option value="newtaipei">新北市</option><option value="taoyuan">桃園市</option>
           </select></span></label>
-          <label>使用分區<span class="field"><input id="zone" type="text"></span></label>
+          <label class="single">使用分區<span class="field"><input id="zone" type="text"></span></label>
         </div>
-        <label>基地面積（謄本）<span class="field"><input id="area" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
+        <label class="single">基地面積（謄本）<span class="field"><input id="area" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
+        <div class="floor-wrap" id="parcel-wrap" hidden>
+          <table class="floors-in">
+            <thead><tr><th>地號</th><th>面積 ㎡</th><th>分區</th><th>建蔽 %</th><th>容積 %</th><th></th></tr></thead>
+            <tbody id="parcels"></tbody>
+          </table>
+        </div>
         <p class="hint" id="area-ping"></p>
+        <div><button type="button" id="add-parcel">新增地號（多筆合併計算）</button></div>
         <div class="row">
           <label>法定保留地<span class="field"><input id="reserved" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
           <label>騎樓<span class="field"><input id="arcade" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
         </div>
-        <div class="row">
+        <div class="row single">
           <label>建蔽率<span class="field"><input id="coverage" type="number" step="0.1" min="0" inputmode="decimal"><span class="unit">%</span></span></label>
           <label>容積率<span class="field"><input id="far" type="number" step="1" min="0" inputmode="decimal"><span class="unit">%</span></span></label>
         </div>
@@ -259,7 +267,7 @@ __ENGINE__
     $("rfloors").value = (state.rooftop || {}).floors || 0;
     $("excav").value = bm.excavation_ratio == null ? "" : r2(bm.excavation_ratio * 100);
     $("bldg").value = state.building_area_m2 || "";
-    renderBonuses(); renderFloors(); renderAssume();
+    renderParcels(); renderBonuses(); renderFloors(); renderAssume();
   }
 
   function readForm() {
@@ -272,6 +280,15 @@ __ENGINE__
     state.basement = { floors: num($("bfloors").value) };
     if ($("excav").value !== "") state.basement.excavation_ratio = num($("excav").value) / 100;
     state.rooftop = { floors: num($("rfloors").value) };
+    var rows = document.querySelectorAll("#parcels tr");
+    if (rows.length) {
+      state.parcels = Array.prototype.map.call(rows, function (tr) {
+        var q = function (c) { return tr.querySelector("." + c).value; };
+        var opt = function (c, k) { var v = q(c); return v === "" ? null : num(v) * k; };
+        return { land_no: q("ln"), area_m2: opt("pa", 1), zone: q("pz"), coverage_ratio: opt("pc", 0.01), far: opt("pf", 0.01),
+          source: tr.dataset.source || "手動輸入" };
+      });
+    } else delete state.parcels;
     var b = num($("bldg").value);
     if (b > 0) state.building_area_m2 = b; else delete state.building_area_m2;
     state.bonuses = Array.prototype.map.call(document.querySelectorAll("#bonuses .bonus"), function (row) {
@@ -289,6 +306,26 @@ __ENGINE__
       if (Math.abs(v - RULES.assumptions.params[k].value) > 1e-12) a[k] = v;
     });
     if (Object.keys(a).length) state.assumptions = a; else delete state.assumptions;
+  }
+
+  function renderParcels() {
+    var tb = $("parcels"); tb.innerHTML = "";
+    var ps = state.parcels || [];
+    ps.forEach(function (pc, i) {
+      var tr = document.createElement("tr");
+      tr.dataset.source = pc.source || "";
+      var cell = function (cls, v, n, label) {
+        return '<td><input class="' + cls + (n ? "" : " name") + '" id="pc' + i + cls + '" aria-label="' + label + '" ' +
+          (n ? 'type="number" step="any" min="0" inputmode="decimal"' : "") + ' value="' + esc(v === null || v === undefined ? "" : v) + '"></td>';
+      };
+      tr.innerHTML = cell("ln", pc.land_no, 0, "地號") + cell("pa", pc.area_m2, 1, "面積") + cell("pz", pc.zone, 0, "分區") +
+        cell("pc", pc.coverage_ratio == null ? null : r2(pc.coverage_ratio * 100), 1, "建蔽率") +
+        cell("pf", pc.far == null ? null : r2(pc.far * 100), 1, "容積率") +
+        '<td><button type="button" class="ghost" data-delparcel="' + i + '" aria-label="刪除地號">✕</button></td>';
+      tb.appendChild(tr);
+    });
+    $("parcel-wrap").hidden = !ps.length;
+    $("f").classList.toggle("multi", ps.length > 0);
   }
 
   function renderBonuses() {
@@ -336,7 +373,12 @@ __ENGINE__
   var lastTSV = "";
   function render() {
     readForm(); save();
-    $("area-ping").textContent = state.site.area_m2 ? "＝ " + fmt(state.site.area_m2 * PING) + " 坪" : "";
+    if (state.parcels) {
+      var tot = state.parcels.reduce(function (a, p) { return a + (p.area_m2 || 0); }, 0);
+      $("area-ping").textContent = state.parcels.length + " 筆合計 " + fmt(tot) + " ㎡ ＝ " + fmt(tot * PING) + " 坪；建蔽率、容積率依面積加權。";
+    } else {
+      $("area-ping").textContent = state.site.area_m2 ? "＝ " + fmt(state.site.area_m2 * PING) + " 坪" : "";
+    }
     var rules = E.loadRules(RULES, state.city);
     $("excav-hint").textContent = rules.excavation_tiers ? "預設：" + rules.excavation_tiers.label : "這個縣市還沒有開挖率規則，有地下室就要填。";
     var n = Object.keys(state.assumptions || {}).length;
@@ -453,6 +495,21 @@ __ENGINE__
 
   $("f").addEventListener("input", render);
   $("f").addEventListener("submit", function (e) { e.preventDefault(); });
+  $("add-parcel").addEventListener("click", function () {
+    readForm();
+    if (!state.parcels) {
+      var s = state.site;
+      state.parcels = [{ land_no: "", area_m2: s.area_m2 || null, zone: s.zone || "", coverage_ratio: s.coverage_ratio || null, far: s.far || null }];
+    }
+    state.parcels.push({ land_no: "", area_m2: null, zone: "", coverage_ratio: null, far: null });
+    renderParcels(); render();
+  });
+  $("parcels").addEventListener("click", function (e) {
+    var i = e.target.dataset.delparcel; if (i === undefined) return;
+    readForm(); state.parcels.splice(+i, 1);
+    if (!state.parcels.length) delete state.parcels;
+    renderParcels(); render();
+  });
   $("add-bonus").addEventListener("click", function () { readForm(); state.bonuses.push({ name: "獎勵", ratio: 0 }); renderBonuses(); render(); });
   $("bonuses").addEventListener("click", function (e) {
     var i = e.target.dataset.del; if (i === undefined) return;
@@ -485,7 +542,8 @@ __ENGINE__
   $("paste-ok").addEventListener("click", function () {
     try {
       var c = JSON.parse($("paste-text").value);
-      if (!c.site || !c.site.area_m2) throw new Error("缺少 site.area_m2（基地面積）");
+      if (!(c.parcels && c.parcels.length) && !(c.site && c.site.area_m2)) throw new Error("缺少基地面積（site.area_m2 或 parcels）");
+      c.site = c.site || {};
       c.bonuses = c.bonuses || []; c.floors = c.floors || [];
       state = c; fillForm(); render(); $("paste-box").hidden = true; toast("已套用案件檔");
     } catch (e) { $("paste-err").hidden = false; $("paste-err").textContent = "無法讀取：" + e.message; }
