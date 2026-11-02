@@ -111,6 +111,19 @@ td.c-pos { color: var(--bad) }
 footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 12px }
 body[data-target="artifact"] .pages-only { display: none }
 form.multi .single { display: none }
+form.multi #zone-custom-wrap { display: none }
+#parcels input.ln { min-width: 88px }
+table.floors-in select { width: 100%; min-width: 96px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper);
+  color: var(--ink); font: 13px var(--body); padding: 5px 4px }
+.dock { display: none }
+@media (max-width: 900px) {
+  .dock { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; gap: 12px; justify-content: space-around;
+    background: var(--ink); color: var(--paper); font-size: 12px;
+    padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
+  .dock b { display: block; font: 500 16px var(--mono); font-variant-numeric: tabular-nums }
+  .dock a { color: inherit; text-decoration: none; text-align: center }
+  .wrap { padding-bottom: 96px }
+}
 @media (prefers-reduced-motion: no-preference) { .tile .v { transition: color .2s } }
 </style>
 
@@ -146,8 +159,10 @@ form.multi .single { display: none }
           <label>縣市<span class="field"><select id="city">
             <option value="taipei">臺北市</option><option value="newtaipei">新北市</option><option value="taoyuan">桃園市</option>
           </select></span></label>
-          <label class="single">使用分區<span class="field"><input id="zone" type="text"></span></label>
+          <label class="single">使用分區<span class="field"><select id="zone-sel"></select></span></label>
         </div>
+        <label class="single" id="zone-custom-wrap" hidden>分區名稱<span class="field"><input id="zone" type="text" placeholder="例：第二種住宅區"></span></label>
+        <p class="hint single" id="zone-hint"></p>
         <label class="single">基地面積（謄本）<span class="field"><input id="area" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
         <div class="floor-wrap" id="parcel-wrap" hidden>
           <table class="floors-in">
@@ -216,6 +231,7 @@ form.multi .single { display: none }
   </footer>
 </div>
 <div class="toast" id="toast" hidden></div>
+<nav class="dock" id="dock" aria-label="試算摘要"></nav>
 
 <script>
 var RULES = __RULES__;
@@ -257,7 +273,7 @@ __ENGINE__
     var s = state.site, bm = state.basement || {};
     $("name").value = state.name || "";
     $("city").value = state.city || "newtaipei";
-    $("zone").value = s.zone || "";
+    fillZoneSelect();
     $("area").value = s.area_m2 || "";
     $("reserved").value = s.reserved_m2 || "";
     $("arcade").value = s.arcade_m2 || "";
@@ -275,7 +291,7 @@ __ENGINE__
     state.city = $("city").value;
     state.site = {
       area_m2: num($("area").value), reserved_m2: num($("reserved").value), arcade_m2: num($("arcade").value),
-      zone: $("zone").value, coverage_ratio: num($("coverage").value) / 100, far: num($("far").value) / 100
+      zone: $("zone-sel").value === "__other" ? $("zone").value : $("zone-sel").value, coverage_ratio: num($("coverage").value) / 100, far: num($("far").value) / 100
     };
     state.basement = { floors: num($("bfloors").value) };
     if ($("excav").value !== "") state.basement.excavation_ratio = num($("excav").value) / 100;
@@ -285,7 +301,8 @@ __ENGINE__
       state.parcels = Array.prototype.map.call(rows, function (tr) {
         var q = function (c) { return tr.querySelector("." + c).value; };
         var opt = function (c, k) { var v = q(c); return v === "" ? null : num(v) * k; };
-        return { land_no: q("ln"), area_m2: opt("pa", 1), zone: q("pz"), coverage_ratio: opt("pc", 0.01), far: opt("pf", 0.01),
+        var zs = tr.querySelector(".pzs").value;
+        return { land_no: q("ln"), area_m2: opt("pa", 1), zone: zs === "__other" ? q("pz") : zs, coverage_ratio: opt("pc", 0.01), far: opt("pf", 0.01),
           source: tr.dataset.source || "手動輸入" };
       });
     } else delete state.parcels;
@@ -308,6 +325,32 @@ __ENGINE__
     if (Object.keys(a).length) state.assumptions = a; else delete state.assumptions;
   }
 
+  // ---------- 使用分區 ----------
+  function zonesFor(city) { return (RULES[city] && RULES[city].zones) || []; }
+  function zoneByName(name) { return zonesFor(state.city).filter(function (z) { return z.name === name; })[0]; }
+  function zoneOptions(selected) {
+    var zs = zonesFor(state.city), found = false;
+    var opts = ['<option value="">請選擇</option>'].concat(zs.map(function (z) {
+      if (z.name === selected) found = true;
+      var rate = z.far != null ? "（" + r2(z.coverage_ratio * 100) + "% / " + r2(z.far * 100) + "%）" : "";
+      return '<option value="' + esc(z.name) + '"' + (z.name === selected ? " selected" : "") + ">" + esc(z.name + rate) + "</option>";
+    }));
+    opts.push('<option value="__other"' + (selected && !found ? " selected" : "") + ">其他（自行輸入）</option>");
+    return opts.join("");
+  }
+  function zoneHint() {
+    var z = zoneByName($("zone-sel").value), note = (RULES[state.city] || {}).zones_note || "";
+    $("zone-hint").textContent = z && z.far != null ? "已帶入 " + (z.source || "") + " 的上限，可再修改。" : note;
+  }
+  function fillZoneSelect() {
+    var name = (state.site || {}).zone || "";
+    $("zone-sel").innerHTML = zoneOptions(name);
+    var other = $("zone-sel").value === "__other";
+    $("zone-custom-wrap").hidden = !other;
+    $("zone").value = other ? name : "";
+    zoneHint();
+  }
+
   function renderParcels() {
     var tb = $("parcels"); tb.innerHTML = "";
     var ps = state.parcels || [];
@@ -318,7 +361,13 @@ __ENGINE__
         return '<td><input class="' + cls + (n ? "" : " name") + '" id="pc' + i + cls + '" aria-label="' + label + '" ' +
           (n ? 'type="number" step="any" min="0" inputmode="decimal"' : "") + ' value="' + esc(v === null || v === undefined ? "" : v) + '"></td>';
       };
-      tr.innerHTML = cell("ln", pc.land_no, 0, "地號") + cell("pa", pc.area_m2, 1, "面積") + cell("pz", pc.zone, 0, "分區") +
+      var zoneCell = function (i, z) {
+        var sel = '<select class="pzs" id="pc' + i + 'pzs" aria-label="分區">' + zoneOptions(z || "") + "</select>";
+        var custom = z && !zoneByName(z);
+        return "<td>" + sel + '<input class="pz name" id="pc' + i + 'pz" aria-label="分區名稱" placeholder="分區名稱" value="' +
+          esc(custom ? z : "") + '"' + (custom ? "" : " hidden") + "></td>";
+      };
+      tr.innerHTML = cell("ln", pc.land_no, 0, "地號") + cell("pa", pc.area_m2, 1, "面積") + zoneCell(i, pc.zone) +
         cell("pc", pc.coverage_ratio == null ? null : r2(pc.coverage_ratio * 100), 1, "建蔽率") +
         cell("pf", pc.far == null ? null : r2(pc.far * 100), 1, "容積率") +
         '<td><button type="button" class="ghost" data-delparcel="' + i + '" aria-label="刪除地號">✕</button></td>';
@@ -470,6 +519,10 @@ __ENGINE__
     html.push(sheet("參數與法源", "", '<table class="t"><thead><tr><th>項目</th><th>數值</th><th style="text-align:left">來源</th><th>狀態</th></tr></thead><tbody>' + prows + "</tbody></table>"));
 
     out.innerHTML = html.join("");
+    $("dock").innerHTML = T.site
+      ? '<a href="#out">允建<b>' + fmt(v("allowed") * PING, 1) + '</b>坪</a><a href="#out">銷坪<b>' + fmt(v("sales_ping"), 1) +
+        '</b>坪</a><a href="#out">戶數<b>' + fmt(v("units"), 0) + '</b>戶</a><a href="#out">車位<b>' + fmt(v("planned_parking"), 0) + "</b>輛</a>"
+      : '<a href="#out">' + esc(res.status[0][2]) + "</a>";
     lastTSV = (state.name ? state.name + "\n\n" : "") + tsv.join("\n");
   }
 
@@ -493,7 +546,27 @@ __ENGINE__
   }
   function caseJSON() { readForm(); return JSON.stringify(state, null, 2); }
 
-  $("f").addEventListener("input", render);
+  var timer;
+  $("f").addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(render, 120); });
+  $("f").addEventListener("change", function (e) {
+    var t = e.target, z;
+    if (t.id === "city") {
+      readForm(); fillZoneSelect(); renderParcels(); render(); return;
+    }
+    if (t.id === "zone-sel") {
+      $("zone-custom-wrap").hidden = t.value !== "__other";
+      z = zoneByName(t.value);
+      if (z && z.far != null) { $("coverage").value = r2(z.coverage_ratio * 100); $("far").value = r2(z.far * 100); }
+      zoneHint(); render(); return;
+    }
+    if (t.classList.contains("pzs")) {
+      var tr = t.closest("tr");
+      tr.querySelector(".pz").hidden = t.value !== "__other";
+      z = zoneByName(t.value);
+      if (z && z.far != null) { tr.querySelector(".pc").value = r2(z.coverage_ratio * 100); tr.querySelector(".pf").value = r2(z.far * 100); }
+      render();
+    }
+  });
   $("f").addEventListener("submit", function (e) { e.preventDefault(); });
   $("add-parcel").addEventListener("click", function () {
     readForm();

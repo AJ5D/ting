@@ -1,5 +1,113 @@
 {
   "name": "臺北市",
   "params": {},
-  "notes": "臺北市土地使用分區管制自治條例的開挖率、獎勵上限等尚未建檔。開挖率請在案件檔的 basement.excavation_ratio 直接指定。"
+  "notes": "臺北市土地使用分區管制自治條例的開挖率、獎勵上限等尚未建檔。開挖率請在案件檔的 basement.excavation_ratio 直接指定。",
+  "zones": [
+    {
+      "name": "第一種住宅區",
+      "coverage_ratio": 0.3,
+      "far": 0.6,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第二種住宅區",
+      "coverage_ratio": 0.35,
+      "far": 1.2,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第二之一種住宅區",
+      "coverage_ratio": 0.35,
+      "far": 1.6,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第二之二種住宅區",
+      "coverage_ratio": 0.35,
+      "far": 2.25,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第三種住宅區",
+      "coverage_ratio": 0.45,
+      "far": 2.25,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第三之一種住宅區",
+      "coverage_ratio": 0.45,
+      "far": 3.0,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第三之二種住宅區",
+      "coverage_ratio": 0.45,
+      "far": 4.0,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第四種住宅區",
+      "coverage_ratio": 0.5,
+      "far": 3.0,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第四之一種住宅區",
+      "coverage_ratio": 0.5,
+      "far": 4.0,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第一種商業區",
+      "coverage_ratio": 0.55,
+      "far": 3.6,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第二種商業區",
+      "coverage_ratio": 0.65,
+      "far": 6.3,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第三種商業區",
+      "coverage_ratio": 0.65,
+      "far": 5.6,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第四種商業區",
+      "coverage_ratio": 0.75,
+      "far": 8.0,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第二種工業區",
+      "coverage_ratio": 0.45,
+      "far": 2.0,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    },
+    {
+      "name": "第三種工業區",
+      "coverage_ratio": 0.55,
+      "far": 3.0,
+      "source": "臺北市土地使用分區管制自治條例",
+      "status": "待建築師核對"
+    }
+  ],
+  "zones_note": "選分區會帶入自治條例的建蔽率與容積率上限；個別都市計畫另有規定時以都市計畫為準。"
 }
