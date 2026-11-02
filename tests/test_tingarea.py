@@ -64,9 +64,20 @@ def test_excel_formulas_equal_python():
         print("skip: 沒有 LibreOffice")
         return
     from openpyxl import load_workbook
+    parcel_case = {k: v for k, v in SAMPLE.items() if k != "site"}
+    parcel_case["parcels"] = [
+        {"land_no": "甲段1地號", "area_m2": 500, "zone": "住二", "coverage_ratio": 0.5, "far": 1.5},
+        {"land_no": "甲段2地號", "area_m2": 300, "zone": "商二", "coverage_ratio": 0.7, "far": 3.0},
+    ]
+    for case in (SAMPLE, parcel_case):
+        _recalc_matches(soffice, case)
+
+
+def _recalc_matches(soffice, case):
+    from openpyxl import load_workbook
     with tempfile.TemporaryDirectory() as d:
         src = Path(d) / "out.xlsx"
-        m = tingarea.build_xlsx(SAMPLE, list(tingarea.TABLES), src)
+        m = tingarea.build_xlsx(case, list(tingarea.TABLES), src)
         subprocess.run([soffice, "--headless", "--calc", "--convert-to", "xlsx",
                         "--outdir", str(Path(d) / "re"), str(src)],
                        check=True, capture_output=True, timeout=120)
@@ -82,6 +93,21 @@ def test_excel_formulas_equal_python():
                 assert approx(float(got), float(want)), (key, got, want)
             checked += 1
         assert checked > 50
+
+
+def test_multiple_parcels_weighted():
+    case = {k: v for k, v in SAMPLE.items() if k != "site"}
+    case["parcels"] = [
+        {"land_no": "甲段1地號", "area_m2": 500, "zone": "住二", "coverage_ratio": 0.5, "far": 1.5},
+        {"land_no": "甲段2地號", "area_m2": 300, "zone": "商二", "coverage_ratio": 0.7, "far": 3.0},
+    ]
+    m, _, _ = tingarea.compute(case, ["site"])
+    assert approx(m.value("site_area"), 800)
+    assert approx(m.value("base_far"), 500 * 1.5 + 300 * 3.0)
+    assert approx(m.value("bldg_area"), 500 * 0.5 + 300 * 0.7)
+    case["parcels"][1] = dict(case["parcels"][1], far=None)
+    status = dict((t, (ok, msg)) for t, ok, msg in tingarea.check(case))
+    assert status["site"] == (False, "甲段2地號 缺容積率")
 
 
 if __name__ == "__main__":

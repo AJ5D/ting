@@ -94,19 +94,38 @@
     return rows;
   }
 
+  function siteProblem(RULES, c) {
+    var parcels = c.parcels || [];
+    var blank = function (x) { return x === undefined || x === null || x === ""; };
+    var i, k;
+    var fields = [["area_m2", "面積"], ["coverage_ratio", "建蔽率"], ["far", "容積率"]];
+    if (parcels.length) {
+      for (i = 0; i < parcels.length; i++) {
+        for (k = 0; k < fields.length; k++) {
+          if (blank(parcels[i][fields[k][0]])) return (parcels[i].land_no || "第 " + (i + 1) + " 筆地號") + " 缺" + fields[k][1];
+        }
+      }
+    } else {
+      var site = c.site || {};
+      var sf = [["area_m2", "基地面積"], ["coverage_ratio", "建蔽率"], ["far", "容積率"]];
+      for (k = 0; k < sf.length; k++) if (blank(site[sf[k][0]])) return "缺" + sf[k][1];
+    }
+    var bm = c.basement || {};
+    if ((bm.floors || 0) > 0 && blank(bm.excavation_ratio) && !("excavation_tiers" in loadRules(RULES, c.city)))
+      return "這個縣市還沒有開挖率規則，請填開挖率";
+    return null;
+  }
+
   function check(RULES, c) {
     var floors = c.floors || [];
-    var bm = c.basement || {};
-    var noExcav = (bm.floors || 0) > 0 && (bm.excavation_ratio === undefined || bm.excavation_ratio === null) &&
-      !("excavation_tiers" in loadRules(RULES, c.city));
-    var out = [];
-    out.push(noExcav ? ["site", false, "這個縣市還沒有開挖率規則，請填開挖率"] : ["site", true, "基地面積、容積率、建蔽率齊全"]);
-    if (c.building_area_m2 && noExcav) out.push(["coverage", false, "可建量試算做不出來"]);
-    else if (c.building_area_m2) out.push(["coverage", true, "有設計建築面積"]);
-    else out.push(["coverage", false, "缺設計建築面積"]);
+    var problem = siteProblem(RULES, c);
+    var np = (c.parcels || []).length;
+    var out = [["site", !problem, problem || (np ? np + " 筆地號合併計算" : "基地面積、容積率、建蔽率齊全")]];
+    if (!c.building_area_m2) out.push(["coverage", false, "缺設計建築面積"]);
+    else out.push(["coverage", !problem, problem ? "可建量試算做不出來" : "有設計建築面積"]);
     if (floors.length) {
       out.push(["per-floor-volume", true, floors.length + " 層資料"]);
-      out.push(["summary", !noExcav, noExcav ? "可建量試算做不出來" : "全案一張"]);
+      out.push(["summary", !problem, problem ? "可建量試算做不出來" : "全案一張"]);
     } else {
       out.push(["per-floor-volume", false, "缺各層面積"]);
       out.push(["summary", false, "缺各層面積"]);
@@ -127,18 +146,32 @@
       rules[k] = Object.assign({}, rules[k], { value: c.assumptions[k], source: "案件檔覆寫", status: null });
     });
     var m = new Model();
-    var s = c.site;
+    var s = c.site || {};
     var bm = c.basement || {};
-    m.const("site_area", s.area_m2);
+    var parcels = c.parcels || [];
+    var params = [];
+    if (parcels.length) {
+      // 多筆地號：面積相加，建蔽率、容積率以面積加權
+      var terms = function (k) { return parcels.map(function (_, i) { return "{p" + i + "_area}*{p" + i + "_" + k + "}"; }).join("+"); };
+      parcels.forEach(function (pc, i) {
+        var name = (pc.land_no || "地號" + (i + 1)) + "（" + (pc.zone || "") + "）";
+        m.const("p" + i + "_area", pc.area_m2); m.const("p" + i + "_cov", pc.coverage_ratio); m.const("p" + i + "_far", pc.far);
+        params.push({ key: "p" + i + "_area", label: name + "面積", source: pc.source || "案件輸入" });
+      });
+      m.expr("site_area", parcels.map(function (_, i) { return "{p" + i + "_area}"; }).join("+"));
+      m.expr("coverage", "(" + terms("cov") + ")/{site_area}");
+      m.expr("far", "(" + terms("far") + ")/{site_area}");
+    } else {
+      m.const("site_area", s.area_m2);
+      m.const("coverage", s.coverage_ratio);
+      m.const("far", s.far);
+    }
     m.const("reserved", s.reserved_m2 || 0);
     m.const("arcade", s.arcade_m2 || 0);
-    m.const("coverage", s.coverage_ratio);
-    m.const("far", s.far);
     m.const("basement_floors", bm.floors || 0);
     m.const("rooftop_floors", (c.rooftop || {}).floors || 0);
     var bonuses = c.bonuses || [];
     bonuses.forEach(function (b, i) { m.const("bonus_ratio_" + i, b.ratio); });
-    var params = [];
     Object.keys(rules).forEach(function (k) {
       if (k === "excavation_tiers") return;
       m.const(k, rules[k].value);

@@ -18,6 +18,10 @@ CASES = [
          assumptions={"public_ratio": 0.3, "sales_factor": 1.55}),
     dict(SAMPLE, city="taipei", basement={"floors": 4, "excavation_ratio": 0.7}),
     dict(SAMPLE, city="taoyuan", basement={"floors": 3}),  # 沒有開挖率 → 可建量做不出來
+    dict({k: v for k, v in SAMPLE.items() if k != "site"}, parcels=[
+        {"land_no": "甲段1地號", "area_m2": 500, "zone": "住二", "coverage_ratio": 0.5, "far": 1.5},
+        {"land_no": "甲段2地號", "area_m2": 312.5, "zone": "商二", "coverage_ratio": 0.7, "far": 3.0}]),
+    dict(SAMPLE, parcels=[{"land_no": "乙段3地號", "area_m2": 400, "coverage_ratio": 0.5}]),  # 缺容積率
 ]
 
 NODE_SCRIPT = r"""
@@ -58,9 +62,14 @@ def test_js_matches_python():
         m, _, _ = tingarea.compute(case, tables)
         compared = 0
         for key in m.defs:
-            want = m.value(key)
+            try:
+                want = m.value(key)
+            except (TypeError, KeyError):  # 依賴缺資料或未產生的格子，該案本來就不會用到
+                continue
             have = got["values"].get(key)
-            if isinstance(want, str):
+            if want is None:  # 缺資料的欄位，兩邊都應該是空的
+                assert have is None, (key, have)
+            elif isinstance(want, str):
                 assert have == want, (key, have, want)
             else:
                 assert have is not None and abs(have - want) <= 1e-9 * max(1, abs(want)), (key, have, want)
