@@ -1,0 +1,16 @@
+{
+  "name": "前期規劃經驗值（非法規，可在案件檔 assumptions 覆寫）",
+  "params": {
+    "mech_ratio":          {"value": 0.15, "label": "機電及梯間免計比例（允建容積，不含騎樓）"},
+    "mech_indoor_share":   {"value": 0,    "label": "機電設備空間計入比例（室內）"},
+    "mech_other_share":    {"value": 1,    "label": "樓電梯間及其他設備計入比例"},
+    "lobby_share":         {"value": 0.06, "label": "梯廳估算比例（地上樓地板面積）"},
+    "balcony_share":       {"value": 0.09, "label": "陽台估算比例（地上樓地板面積）"},
+    "canopy_share":        {"value": 0,    "label": "外皮雨遮比例（室內淨面積）"},
+    "public_ratio":        {"value": 0.34, "label": "公設比"},
+    "sales_factor":        {"value": 1.62, "label": "銷坪係數（允建容積坪數 × 係數）"},
+    "unit_size_ping":      {"value": 28,   "label": "每戶規劃坪數"},
+    "parking_m2_per_car":  {"value": 120,  "label": "法定汽車位基準（㎡/輛）；依第59條及土管規定各案不同"},
+    "parking_ping_per_space": {"value": 12.5, "label": "地下室每車位所需坪數"}
+  }
+}

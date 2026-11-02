@@ -1,0 +1,25 @@
+{
+  "name": "範例案（數字為虛構）",
+  "city": "newtaipei",
+  "site": {
+    "area_m2": 800,
+    "reserved_m2": 0,
+    "arcade_m2": 0,
+    "zone": "第二種住宅區",
+    "coverage_ratio": 0.5,
+    "far": 1.5
+  },
+  "bonuses": [
+    {"name": "容積移轉", "ratio": 0.2}
+  ],
+  "basement": {"floors": 2},
+  "rooftop": {"floors": 3},
+  "building_area_m2": 380,
+  "floors": [
+    {"name": "1F", "floor_area_m2": 300, "balcony_m2": 0,  "lobby_m2": 25, "other_exempt_m2": 30},
+    {"name": "2F", "floor_area_m2": 330, "balcony_m2": 38, "lobby_m2": 25, "other_exempt_m2": 25},
+    {"name": "3F", "floor_area_m2": 330, "balcony_m2": 45, "lobby_m2": 25, "other_exempt_m2": 25},
+    {"name": "4F", "floor_area_m2": 330, "balcony_m2": 38, "lobby_m2": 25, "other_exempt_m2": 25},
+    {"name": "5F", "floor_area_m2": 330, "balcony_m2": 38, "lobby_m2": 25, "other_exempt_m2": 25}
+  ]
+}

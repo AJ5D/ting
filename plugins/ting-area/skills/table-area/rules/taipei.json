@@ -1,0 +1,5 @@
+{
+  "name": "臺北市",
+  "params": {},
+  "notes": "臺北市土地使用分區管制自治條例的開挖率、獎勵上限等尚未建檔。開挖率請在案件檔的 basement.excavation_ratio 直接指定。"
+}

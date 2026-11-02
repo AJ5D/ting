@@ -1,0 +1,4 @@
+__pycache__/
+# 個案資料與產出檔不進 repo
+cases/
+*.xlsx
