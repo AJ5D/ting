@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Ting 容積試算</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600&display=swap">
+<style>
+/* 版面：左側是圖框式的輸入欄，右側是檢討表；手機時上下堆疊 */
+:root {
+  --paper: #f4f6f4; --sheet: #ffffff; --ink: #1b2a2d; --muted: #5a6a6c; --line: #d3dad7;
+  --accent: #1f5f6b; --accent-ink: #ffffff; --accent-soft: #e0ecec;
+  --ok: #2c7548; --ok-soft: #e1f0e6; --warn: #9a6210; --warn-soft: #f6ead6; --bad: #a83a2e; --bad-soft: #f6e1de;
+  --display: "Noto Serif TC", "Songti TC", serif;
+  --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #111718; --sheet: #182022; --ink: #e3ebe9; --muted: #96a6a6; --line: #2c393b;
+  --accent: #74b6c1; --accent-ink: #0d1a1c; --accent-soft: #1d2f32;
+  --ok: #72c290; --ok-soft: #173025; --warn: #e2a64c; --warn-soft: #33281a; --bad: #ec8073; --bad-soft: #3a1f1c;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #111718; --sheet: #182022; --ink: #e3ebe9; --muted: #96a6a6; --line: #2c393b;
+  --accent: #74b6c1; --accent-ink: #0d1a1c; --accent-soft: #1d2f32;
+  --ok: #72c290; --ok-soft: #173025; --warn: #e2a64c; --warn-soft: #33281a; --bad: #ec8073; --bad-soft: #3a1f1c;
+  color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--paper); color: var(--ink); font: 15px/1.6 var(--body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 24px; }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px;
+  border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+h1 { font: 600 28px/1.2 var(--display); margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13px; margin: 4px 0 0 }
+.actions { display: flex; flex-wrap: wrap; gap: 8px }
+button { font: 500 14px var(--body); border-radius: 6px; border: 1px solid var(--line); background: var(--sheet);
+  color: var(--ink); padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent) }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 8px }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px }
+.grid { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 24px; align-items: start }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr) } }
+
+/* 輸入欄 */
+form.input { display: grid; gap: 16px; min-width: 0 }
+fieldset { margin: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--sheet); padding: 12px 14px 14px;
+  display: grid; gap: 10px; min-width: 0 }
+legend { font-weight: 700; font-size: 13px; letter-spacing: .08em; color: var(--accent); padding: 0 6px }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px }
+label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); min-width: 0 }
+.field { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--paper) }
+.field:focus-within { border-color: var(--accent) }
+.field input, .field select { border: 0; background: transparent; color: var(--ink); font: 15px var(--body);
+  padding: 7px 8px; width: 100%; min-width: 0 }
+.field input[type=number] { font-family: var(--mono); font-variant-numeric: tabular-nums }
+.field input:focus, .field select:focus { outline: none }
+.unit { color: var(--muted); font-size: 13px; padding-right: 8px; white-space: nowrap }
+.hint { font-size: 12px; color: var(--muted); margin: 0 }
+.bonus { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: center }
+details summary { cursor: pointer; font-size: 14px; font-weight: 500 }
+details[open] summary { margin-bottom: 8px }
+.floor-wrap { overflow-x: auto }
+table.floors-in { border-collapse: collapse; width: 100%; font-size: 13px }
+table.floors-in th { font-weight: 500; color: var(--muted); text-align: left; padding: 2px 4px }
+table.floors-in td { padding: 2px }
+table.floors-in input { width: 100%; min-width: 56px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper);
+  color: var(--ink); font: 13px var(--mono); padding: 5px 6px }
+table.floors-in input.name { font-family: var(--body); min-width: 44px }
+
+/* 結果 */
+.out { display: grid; gap: 20px; min-width: 0 }
+.chips { display: flex; flex-wrap: wrap; gap: 8px }
+.chip { font-size: 13px; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--line); background: var(--sheet) }
+.chip.on { background: var(--ok-soft); border-color: transparent; color: var(--ok) }
+.chip.off { color: var(--muted) }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px }
+@media (max-width: 640px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.tile { border-top: 3px solid var(--accent); background: var(--sheet); padding: 10px 12px 12px; border-radius: 0 0 6px 6px }
+.tile .k { font-size: 12px; color: var(--muted); letter-spacing: .04em }
+.tile .v { font: 500 24px/1.2 var(--mono); font-variant-numeric: tabular-nums; margin-top: 4px }
+.tile .u { font: 13px var(--body); color: var(--muted); margin-left: 4px }
+.tile .s { font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums }
+section.sheet { background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; min-width: 0 }
+section.sheet > header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 12px 14px; border-bottom: 1px solid var(--line) }
+section.sheet h2 { font: 600 18px var(--display); margin: 0 }
+section.sheet .note { font-size: 12px; color: var(--muted) }
+.scroll { overflow-x: auto }
+table.t { border-collapse: collapse; width: 100%; font-size: 14px }
+table.t th, table.t td { padding: 6px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap }
+table.t th { font-weight: 500; color: var(--muted); font-size: 12px; background: var(--paper) }
+table.t th:first-child, table.t td:first-child { text-align: left; white-space: normal; min-width: 9em }
+table.t td.n { font-family: var(--mono); font-variant-numeric: tabular-nums }
+table.t tr.strong td { font-weight: 700 }
+table.t tr.total td { border-top: 2px solid var(--ink); font-weight: 700 }
+table.t td.f { font: 11px var(--mono); color: var(--muted); text-align: left; white-space: normal; min-width: 14em }
+.pill { display: inline-block; font: 500 12px var(--body); border-radius: 4px; padding: 1px 8px }
+.pill.ok { background: var(--ok-soft); color: var(--ok) }
+.pill.bad { background: var(--bad-soft); color: var(--bad) }
+.pill.warn { background: var(--warn-soft); color: var(--warn) }
+td.c-pos { color: var(--bad) }
+.empty { padding: 16px 14px; color: var(--muted); font-size: 14px; margin: 0 }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--paper); padding: 8px 16px; border-radius: 6px; font-size: 14px; z-index: 20 }
+.paste { display: grid; gap: 8px }
+.paste textarea { width: 100%; min-height: 140px; font: 12px var(--mono); background: var(--paper); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px }
+.err { color: var(--bad); font-size: 13px; margin: 0 }
+footer { color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 12px }
+body[data-target="artifact"] .pages-only { display: none }
+@media (prefers-reduced-motion: no-preference) { .tile .v { transition: color .2s } }
+</style>
+
+</head>
+<body data-target="pages">
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Ting 容積試算</h1>
+      <p class="sub">前期規劃：可建量、建蔽率、各層容積檢討、樓地板面積總表。單位 ㎡，1 坪 = 3.3058 ㎡。</p>
+    </div>
+    <div class="actions">
+      <button type="button" id="btn-copy-tables" class="primary">複製全部表格</button>
+      <button type="button" id="btn-copy-case">複製案件檔</button>
+      <button type="button" id="btn-paste-case">貼上案件檔</button>
+      <button type="button" id="btn-download-case" class="pages-only">下載案件檔</button>
+      <button type="button" id="btn-sample" class="ghost">載入範例</button>
+    </div>
+  </header>
+
+  <div class="paste" id="paste-box" hidden>
+    <label for="paste-text">貼上案件檔（JSON，可從 /table-area 或「複製案件檔」取得）</label>
+    <textarea id="paste-text"></textarea>
+    <p class="err" id="paste-err" hidden></p>
+    <div class="actions"><button type="button" id="paste-ok" class="primary">套用</button><button type="button" id="paste-cancel">取消</button></div>
+  </div>
+
+  <div class="grid">
+    <form class="input" id="f" autocomplete="off">
+      <fieldset>
+        <legend>基地</legend>
+        <label>案名<span class="field"><input id="name" type="text"></span></label>
+        <div class="row">
+          <label>縣市<span class="field"><select id="city">
+            <option value="taipei">臺北市</option><option value="newtaipei">新北市</option><option value="taoyuan">桃園市</option>
+          </select></span></label>
+          <label>使用分區<span class="field"><input id="zone" type="text"></span></label>
+        </div>
+        <label>基地面積（謄本）<span class="field"><input id="area" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
+        <p class="hint" id="area-ping"></p>
+        <div class="row">
+          <label>法定保留地<span class="field"><input id="reserved" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
+          <label>騎樓<span class="field"><input id="arcade" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
+        </div>
+        <div class="row">
+          <label>建蔽率<span class="field"><input id="coverage" type="number" step="0.1" min="0" inputmode="decimal"><span class="unit">%</span></span></label>
+          <label>容積率<span class="field"><input id="far" type="number" step="1" min="0" inputmode="decimal"><span class="unit">%</span></span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>獎勵與容移</legend>
+        <p class="hint">比例以基準容積計。</p>
+        <div id="bonuses" style="display:grid;gap:8px"></div>
+        <div><button type="button" id="add-bonus">新增一項</button></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>地下室與屋突</legend>
+        <div class="row">
+          <label>地下開挖層數<span class="field"><input id="bfloors" type="number" step="1" min="0" inputmode="numeric"><span class="unit">層</span></span></label>
+          <label>屋突層數<span class="field"><input id="rfloors" type="number" step="1" min="0" max="3" inputmode="numeric"><span class="unit">層</span></span></label>
+        </div>
+        <label>開挖率（留空＝依縣市規則）<span class="field"><input id="excav" type="number" step="0.1" min="0" max="100" inputmode="decimal"><span class="unit">%</span></span></label>
+        <p class="hint" id="excav-hint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>設計資料（有才填）</legend>
+        <label>設計建築面積<span class="field"><input id="bldg" type="number" step="0.01" min="0" inputmode="decimal"><span class="unit">㎡</span></span></label>
+        <p class="hint">各層面積：樓地板面積不含陽台；梯廳、其他免計（樓梯間、機電等）包含在樓地板面積內。</p>
+        <div class="floor-wrap">
+          <table class="floors-in">
+            <thead><tr><th>樓層</th><th>樓地板</th><th>陽台</th><th>梯廳</th><th>其他免計</th><th></th></tr></thead>
+            <tbody id="floors"></tbody>
+          </table>
+        </div>
+        <div class="actions"><button type="button" id="add-floor">新增樓層</button><button type="button" id="dup-floor">複製最後一層</button></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>前期經驗值</legend>
+        <details id="assume-box">
+          <summary>公設比、銷坪係數等 <span class="hint" id="assume-changed"></span></summary>
+          <div id="assume" style="display:grid;gap:8px"></div>
+          <div style="margin-top:8px"><button type="button" id="assume-reset">全部恢復預設</button></div>
+        </details>
+      </fieldset>
+    </form>
+
+    <div class="out" id="out"></div>
+  </div>
+
+  <footer>
+    法規參數標「待建築師核對」者尚未經建築師確認；經驗值僅供前期估算，送審數字以建築師簽證圖說為準。
+    算式與規則和 Claude 的 /table-area 共用同一份檔案（AJ5D/ting），兩邊結果一致；要有公式的 Excel，按「複製案件檔」後交給 /table-area。
+  </footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+var RULES = {"national": {"name": "全國（建築技術規則）", "params": {"balcony_cap_ratio": {"value": 0.125, "label": "陽台免計上限（該層樓地板面積比例）", "source": "建築技術規則建築設計施工編 第162條", "status": "待建築師核對"}, "lobby_cap_ratio": {"value": 0.1, "label": "梯廳免計上限（該層樓地板面積比例）", "source": "建築技術規則建築設計施工編 第162條", "status": "待建築師核對"}, "balcony_lobby_cap_ratio": {"value": 0.15, "label": "陽台＋梯廳合計免計上限（該層樓地板面積比例）", "source": "建築技術規則建築設計施工編 第162條", "status": "待建築師核對"}, "rooftop_ratio": {"value": 0.125, "label": "屋突每層面積上限（建築面積比例）", "source": "建築技術規則建築設計施工編 第1條第10款", "status": "待建築師核對"}, "rooftop_max_floors": {"value": 3, "label": "屋突最多層數", "source": "建築技術規則建築設計施工編 第1條第10款", "status": "待建築師核對"}}}, "newtaipei": {"name": "新北市", "params": {"excavation_tiers": {"value": [{"upto": 500, "ratio": 0.7}, {"upto": null, "ratio": 0.6}], "label": "地下開挖率級距（基地前 500㎡ 70%，超過部分 60%）", "source": "沿用林口特定區案試算表；實際依各都市計畫土管要點", "status": "待建築師核對"}}}, "taipei": {"name": "臺北市", "params": {}, "notes": "臺北市土地使用分區管制自治條例的開挖率、獎勵上限等尚未建檔。開挖率請在案件檔的 basement.excavation_ratio 直接指定。"}, "taoyuan": {"name": "桃園市", "params": {}, "notes": "桃園市各都市計畫土管要點尚未建檔。開挖率請在案件檔的 basement.excavation_ratio 直接指定。"}, "assumptions": {"name": "前期經驗值（非法規，可覆寫）", "params": {"mech_ratio": {"value": 0.15, "label": "機電及梯間免計比例（允建容積，不含騎樓）"}, "mech_indoor_share": {"value": 0, "label": "機電設備空間計入比例（室內）"}, "mech_other_share": {"value": 1, "label": "樓電梯間及其他設備計入比例"}, "lobby_share": {"value": 0.06, "label": "梯廳估算比例（地上樓地板面積）"}, "balcony_share": {"value": 0.09, "label": "陽台估算比例（地上樓地板面積）"}, "canopy_share": {"value": 0, "label": "外皮雨遮比例（室內淨面積）"}, "public_ratio": {"value": 0.34, "label": "公設比"}, "sales_factor": {"value": 1.62, "label": "銷坪係數（允建容積坪數 × 係數）"}, "unit_size_ping": {"value": 28, "label": "每戶規劃坪數"}, "parking_m2_per_car": {"value": 120, "label": "法定汽車位基準（㎡/輛）；依第59條及土管規定各案不同"}, "parking_ping_per_space": {"value": 12.5, "label": "地下室每車位所需坪數"}}}, "formulas": {"_說明": "所有表格的算式。{key} 指向參數或其他列；Python 引擎與網頁計算器共用這一份。@BONUS_SUM@ 會換成各獎勵列相加，沒有獎勵時為 0。", "site_head": [["usable", "使用基地面積", "{site_area}-{reserved}", "㎡", true], ["bldg_area", "法定建築面積", "{usable}*{coverage}", "㎡", true], ["base_far", "基準容積樓地板面積", "{usable}*{far}", "㎡", true]], "site_bonus": ["bonus_@I@", "@NAME@", "{base_far}*{bonus_ratio_@I@}", "㎡", true], "site_tail": [["far_total", "基準＋獎勵＋容移", "{base_far}+@BONUS_SUM@", "㎡", true], ["allowed", "允建容積樓地板面積（含騎樓）", "{arcade}+{far_total}", "㎡", true], ["far_effective", "實際容積率", "{far_total}/{usable}", "", false], ["mech_indoor", "機電設備空間", "{far_total}*{mech_ratio}*{mech_indoor_share}", "㎡", true], ["stair_mech", "樓電梯間及其他設備", "{far_total}*{mech_ratio}*{mech_other_share}", "㎡", true], ["above", "地上樓地板面積（含梯廳）", "({allowed}+{mech_indoor}+{stair_mech})/(1-{lobby_share})", "㎡", true], ["balcony", "陽台面積", "{above}*{balcony_share}", "㎡", true], ["lobby", "梯廳面積", "{above}*{lobby_share}", "㎡", true], ["rooftop", "屋突面積", "{bldg_area}*{rooftop_ratio}*{rooftop_floors}", "㎡", true], ["canopy", "外皮雨遮", "({allowed}+{mech_indoor})*{canopy_share}", "㎡", true], ["basement", "地下室樓地板面積", "{usable}*{excav_ratio}*{basement_floors}", "㎡", true], ["permit_area", "建照申請面積", "{above}+{rooftop}+{basement}+{balcony}", "㎡", true], ["total_area", "總面積（含雨遮）", "{above}+{balcony}+{canopy}+{rooftop}+{basement}", "㎡", true], ["sales_m2", "銷售面積（公設比法）", "({allowed}+{mech_indoor}+{balcony}+{canopy})/(1-{public_ratio})", "㎡", true], ["sales_ping", "銷售坪數（公設比法）", "ROUND({sales_m2}*0.3025,2)", "坪", false], ["sales_ping_factor", "銷售坪數（係數法，交叉比對）", "{allowed}*0.3025*{sales_factor}", "坪", false], ["units", "預計戶數", "ROUND({sales_ping}/{unit_size_ping},0)", "戶", false], ["legal_parking", "法定汽車位", "({allowed}+{stair_mech}+{lobby}+{rooftop})/{parking_m2_per_car}", "輛", false], ["planned_parking", "地下室可規劃車位", "INT({basement}*0.3025/{parking_ping_per_space})", "輛", false]], "coverage": [["usable", "使用基地面積", null, "㎡", true], ["cov_legal", "法定建築面積", "{usable}*{coverage}", "㎡", true], ["cov_design", "設計建築面積", null, "㎡", true], ["cov_ratio", "設計建蔽率", "{cov_design}/{usable}", "", false], ["cov_result", "判定", "IF({cov_design}<={cov_legal},\"符合\",\"超過\")", "", false]], "floor": [["a0", "樓地板面積（不含陽台）", null], ["bal", "陽台", null], ["lob", "梯廳", null], ["oth", "其他免計（樓梯間、機電等）", null], ["A", "(A) 該層面積（含陽台）", "{%a0}+{%bal}"], ["bal_cap", "陽台上限 1/8", "{%a0}*{balcony_cap_ratio}"], ["lob_cap", "梯廳上限 10%", "{%a0}*{lobby_cap_ratio}"], ["comb_cap", "合計上限 15%", "{%a0}*{balcony_lobby_cap_ratio}"], ["B", "(B) 申請免計", "{%bal}+{%lob}+{%oth}"], ["C", "(C) 超過上限回計", "{%bal}+{%lob}-MIN(MIN({%bal},{%bal_cap})+MIN({%lob},{%lob_cap}),{%comb_cap})"], ["vol", "容積樓地板面積 (A)-(B)+(C)", "{%A}-{%B}+{%C}"]]}};
+</script>
+<script>
+/* 面積與容積檢討表引擎（網頁版）。
+ * 與 plugins/ting-area/skills/table-area/scripts/tingarea.py 同邏輯，
+ * 算式與規則都讀同一份 rules/*.json；tests/test_web_engine.py 會比對兩邊每一格。 */
+(function (root) {
+  "use strict";
+  var PING = 0.3025;
+  var CITIES = { taipei: "臺北市", newtaipei: "新北市", taoyuan: "桃園市" };
+  var TABLES = {
+    site: "可建量試算",
+    coverage: "建蔽率檢討",
+    "per-floor-volume": "各層容積檢討",
+    summary: "各層樓地板面積總表"
+  };
+
+  // RULES = { national, newtaipei, taipei, taoyuan, assumptions, formulas }，由頁面或測試注入
+  function loadRules(RULES, city) {
+    var out = {};
+    var files = ["national"];
+    if (city) {
+      if (!CITIES[city]) throw new Error("不支援的縣市 " + city);
+      files.push(city);
+    }
+    files.push("assumptions");
+    files.forEach(function (name) {
+      var data = RULES[name];
+      Object.keys(data.params || {}).forEach(function (k) {
+        var v = Object.assign({}, data.params[k]);
+        if (!("source" in v)) v.source = data.name;
+        out[k] = v;
+      });
+    });
+    return out;
+  }
+
+  function excavationFormula(tiers) {
+    var parts = [], lower = 0;
+    tiers.forEach(function (t) {
+      if (t.upto === null) {
+        parts.push("MAX({usable}-" + lower + ",0)*" + t.ratio);
+      } else {
+        parts.push("MAX(MIN({usable}," + t.upto + ")-" + lower + ",0)*" + t.ratio);
+        lower = t.upto;
+      }
+    });
+    return "(" + parts.join("+") + ")/{usable}";
+  }
+
+  function round(x, n) {
+    n = n || 0;
+    var q = Math.pow(10, n);
+    var v = Math.floor(Math.abs(x) * q + 0.5) / q * (x >= 0 ? 1 : -1);
+    return v;
+  }
+  var FUNCS = {
+    MIN: Math.min, MAX: Math.max, ROUND: round, INT: Math.floor,
+    IF: function (c, a, b) { return c ? a : b; }
+  };
+
+  function Model() {
+    this.defs = {};
+    this.cache = {};
+  }
+  Model.prototype.const = function (k, v) { this.defs[k] = { c: v }; };
+  Model.prototype.expr = function (k, t) { this.defs[k] = { e: t }; };
+  Model.prototype.value = function (k) {
+    if (k in this.cache) return this.cache[k];
+    var d = this.defs[k];
+    if (!d) throw new Error("未定義的項目 " + k);
+    var val;
+    if ("c" in d) {
+      val = d.c;
+    } else {
+      var self = this;
+      var js = d.e.replace(/\{(\w+)\}/g, function (_, key) { return "v(" + JSON.stringify(key) + ")"; });
+      var fn = new Function("v", "MIN", "MAX", "ROUND", "INT", "IF", "return (" + js + ");");
+      val = fn(function (key) { return self.value(key); }, FUNCS.MIN, FUNCS.MAX, FUNCS.ROUND, FUNCS.INT, FUNCS.IF);
+    }
+    this.cache[k] = val;
+    return val;
+  }
+
+  function siteRows(F, bonuses) {
+    var rows = F.site_head.map(function (r) { return r.slice(); });
+    var keys = [];
+    bonuses.forEach(function (b, i) {
+      var t = F.site_bonus;
+      rows.push([t[0].replace("@I@", i), b.name, t[2].replace("@I@", i), t[3], t[4]]);
+      keys.push(rows[rows.length - 1][0]);
+    });
+    var sum = keys.map(function (k) { return "{" + k + "}"; }).join("+") || "0";
+    F.site_tail.forEach(function (r) {
+      rows.push([r[0], r[1], r[2].replace("@BONUS_SUM@", sum), r[3], r[4]]);
+    });
+    return rows;
+  }
+
+  function check(RULES, c) {
+    var floors = c.floors || [];
+    var bm = c.basement || {};
+    var noExcav = (bm.floors || 0) > 0 && (bm.excavation_ratio === undefined || bm.excavation_ratio === null) &&
+      !("excavation_tiers" in loadRules(RULES, c.city));
+    var out = [];
+    out.push(noExcav ? ["site", false, "這個縣市還沒有開挖率規則，請填開挖率"] : ["site", true, "基地面積、容積率、建蔽率齊全"]);
+    if (c.building_area_m2 && noExcav) out.push(["coverage", false, "可建量試算做不出來"]);
+    else if (c.building_area_m2) out.push(["coverage", true, "有設計建築面積"]);
+    else out.push(["coverage", false, "缺設計建築面積"]);
+    if (floors.length) {
+      out.push(["per-floor-volume", true, floors.length + " 層資料"]);
+      out.push(["summary", !noExcav, noExcav ? "可建量試算做不出來" : "全案一張"]);
+    } else {
+      out.push(["per-floor-volume", false, "缺各層面積"]);
+      out.push(["summary", false, "缺各層面積"]);
+    }
+    return out;
+  }
+
+  // 回傳 { model, params, tables: {site: rows, coverage: rows, floors: [...], floorCols}, status }
+  function compute(RULES, c) {
+    var F = RULES.formulas;
+    var status = check(RULES, c);
+    var ok = {};
+    status.forEach(function (s) { ok[s[0]] = s[1]; });
+
+    var rules = loadRules(RULES, c.city);
+    Object.keys(c.assumptions || {}).forEach(function (k) {
+      if (!(k in rules)) throw new Error("assumptions 裡的 " + k + " 不是已知參數");
+      rules[k] = Object.assign({}, rules[k], { value: c.assumptions[k], source: "案件檔覆寫", status: null });
+    });
+    var m = new Model();
+    var s = c.site;
+    var bm = c.basement || {};
+    m.const("site_area", s.area_m2);
+    m.const("reserved", s.reserved_m2 || 0);
+    m.const("arcade", s.arcade_m2 || 0);
+    m.const("coverage", s.coverage_ratio);
+    m.const("far", s.far);
+    m.const("basement_floors", bm.floors || 0);
+    m.const("rooftop_floors", (c.rooftop || {}).floors || 0);
+    var bonuses = c.bonuses || [];
+    bonuses.forEach(function (b, i) { m.const("bonus_ratio_" + i, b.ratio); });
+    var params = [];
+    Object.keys(rules).forEach(function (k) {
+      if (k === "excavation_tiers") return;
+      m.const(k, rules[k].value);
+      params.push({ key: k, label: rules[k].label, source: rules[k].source, status: rules[k].status });
+    });
+    if (bm.excavation_ratio !== undefined && bm.excavation_ratio !== null) {
+      m.const("excav_ratio", bm.excavation_ratio);
+      params.push({ key: "excav_ratio", label: "地下開挖率", source: "案件輸入" });
+    } else if (rules.excavation_tiers) {
+      m.expr("excav_ratio", excavationFormula(rules.excavation_tiers.value));
+      params.push({ key: "excav_ratio", label: rules.excavation_tiers.label,
+        source: rules.excavation_tiers.source, status: rules.excavation_tiers.status });
+    } else {
+      m.const("excav_ratio", 0);
+    }
+
+    var tables = {};
+    var site = siteRows(F, bonuses);
+    site.forEach(function (r) { m.expr(r[0], r[2]); });
+    if (ok.site) tables.site = site;
+    if (ok.coverage) {
+      m.const("cov_design", c.building_area_m2);
+      F.coverage.forEach(function (r) { if (r[2]) m.expr(r[0], r[2]); });
+      tables.coverage = F.coverage;
+    }
+    if (ok["per-floor-volume"]) {
+      c.floors.forEach(function (fl, i) {
+        var p = "f" + i + "_";
+        m.const(p + "a0", fl.floor_area_m2 || 0);
+        m.const(p + "bal", fl.balcony_m2 || 0);
+        m.const(p + "lob", fl.lobby_m2 || 0);
+        m.const(p + "oth", fl.other_exempt_m2 || 0);
+        F.floor.forEach(function (col) {
+          if (col[2]) m.expr(p + col[0], col[2].split("{%").join("{" + p));
+        });
+      });
+      tables.floors = c.floors;
+      tables.floorCols = F.floor;
+    }
+    if (ok.summary) {
+      ["a0", "bal", "lob", "oth", "vol"].forEach(function (suf) {
+        m.expr("sum_" + suf, c.floors.map(function (_, i) { return "{f" + i + "_" + suf + "}"; }).join("+"));
+      });
+      m.expr("sum_diff", "{allowed}-{sum_vol}");
+      m.expr("sum_result", 'IF({sum_vol}<={allowed},"符合","超過")');
+      tables.summary = true;
+    }
+    return { model: m, params: params, tables: tables, status: status };
+  }
+
+  var api = { PING: PING, CITIES: CITIES, TABLES: TABLES, loadRules: loadRules, check: check, compute: compute };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.TingArea = api;
+})(this);
+
+</script>
+<script>
+(function () {
+  "use strict";
+  var E = window.TingArea, PING = E.PING;
+  var STORE = "ting-area-draft-v1";
+  var SAMPLE = {"name": "範例案（數字為虛構）", "city": "newtaipei", "site": {"area_m2": 800, "reserved_m2": 0, "arcade_m2": 0, "zone": "第二種住宅區", "coverage_ratio": 0.5, "far": 1.5}, "bonuses": [{"name": "容積移轉", "ratio": 0.2}], "basement": {"floors": 2}, "rooftop": {"floors": 3}, "building_area_m2": 380, "floors": [{"name": "1F", "floor_area_m2": 300, "balcony_m2": 0, "lobby_m2": 25, "other_exempt_m2": 30}, {"name": "2F", "floor_area_m2": 330, "balcony_m2": 38, "lobby_m2": 25, "other_exempt_m2": 25}, {"name": "3F", "floor_area_m2": 330, "balcony_m2": 45, "lobby_m2": 25, "other_exempt_m2": 25}, {"name": "4F", "floor_area_m2": 330, "balcony_m2": 38, "lobby_m2": 25, "other_exempt_m2": 25}, {"name": "5F", "floor_area_m2": 330, "balcony_m2": 38, "lobby_m2": 25, "other_exempt_m2": 25}]};
+  // 經驗值輸入方式：pct＝以百分比輸入
+  var ASSUME_FMT = {
+    mech_ratio: "pct", mech_indoor_share: "pct", mech_other_share: "pct", lobby_share: "pct", balcony_share: "pct",
+    canopy_share: "pct", public_ratio: "pct", sales_factor: "×", unit_size_ping: "坪/戶", parking_m2_per_car: "㎡/輛",
+    parking_ping_per_space: "坪/位"
+  };
+  var $ = function (id) { return document.getElementById(id); };
+  var state;
+
+  function load() {
+    try { var s = localStorage.getItem(STORE); if (s) return JSON.parse(s); } catch (e) {}
+    return JSON.parse(JSON.stringify(SAMPLE));
+  }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+
+  var r2 = function (x) { return Math.round(x * 1e6) / 1e6; };
+  var num = function (v) { var x = parseFloat(v); return isFinite(x) ? x : 0; };
+  function fmt(v, d) {
+    if (typeof v !== "number") return v;
+    return v.toLocaleString("zh-TW", { minimumFractionDigits: d === undefined ? 2 : d, maximumFractionDigits: d === undefined ? 2 : d });
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  // ---------- 表單 ⇄ 狀態 ----------
+  function fillForm() {
+    var s = state.site, bm = state.basement || {};
+    $("name").value = state.name || "";
+    $("city").value = state.city || "newtaipei";
+    $("zone").value = s.zone || "";
+    $("area").value = s.area_m2 || "";
+    $("reserved").value = s.reserved_m2 || "";
+    $("arcade").value = s.arcade_m2 || "";
+    $("coverage").value = r2((s.coverage_ratio || 0) * 100);
+    $("far").value = r2((s.far || 0) * 100);
+    $("bfloors").value = bm.floors || 0;
+    $("rfloors").value = (state.rooftop || {}).floors || 0;
+    $("excav").value = bm.excavation_ratio == null ? "" : r2(bm.excavation_ratio * 100);
+    $("bldg").value = state.building_area_m2 || "";
+    renderBonuses(); renderFloors(); renderAssume();
+  }
+
+  function readForm() {
+    state.name = $("name").value;
+    state.city = $("city").value;
+    state.site = {
+      area_m2: num($("area").value), reserved_m2: num($("reserved").value), arcade_m2: num($("arcade").value),
+      zone: $("zone").value, coverage_ratio: num($("coverage").value) / 100, far: num($("far").value) / 100
+    };
+    state.basement = { floors: num($("bfloors").value) };
+    if ($("excav").value !== "") state.basement.excavation_ratio = num($("excav").value) / 100;
+    state.rooftop = { floors: num($("rfloors").value) };
+    var b = num($("bldg").value);
+    if (b > 0) state.building_area_m2 = b; else delete state.building_area_m2;
+    state.bonuses = Array.prototype.map.call(document.querySelectorAll("#bonuses .bonus"), function (row) {
+      return { name: row.querySelector(".bn").value || "獎勵", ratio: num(row.querySelector(".br").value) / 100 };
+    });
+    state.floors = Array.prototype.map.call(document.querySelectorAll("#floors tr"), function (tr) {
+      var q = function (c) { return tr.querySelector("." + c).value; };
+      return { name: q("name") || "?", floor_area_m2: num(q("a0")), balcony_m2: num(q("bal")), lobby_m2: num(q("lob")), other_exempt_m2: num(q("oth")) };
+    });
+    var a = {};
+    document.querySelectorAll("#assume input").forEach(function (inp) {
+      if (inp.value === "") return;
+      var k = inp.dataset.key, v = num(inp.value);
+      if (ASSUME_FMT[k] === "pct") v = v / 100;
+      if (Math.abs(v - RULES.assumptions.params[k].value) > 1e-12) a[k] = v;
+    });
+    if (Object.keys(a).length) state.assumptions = a; else delete state.assumptions;
+  }
+
+  function renderBonuses() {
+    var box = $("bonuses"); box.innerHTML = "";
+    (state.bonuses || []).forEach(function (b, i) {
+      var d = document.createElement("div"); d.className = "bonus";
+      d.innerHTML = '<span class="field"><input class="bn" id="bn' + i + '" aria-label="獎勵名稱" value="' + esc(b.name) + '"></span>' +
+        '<span class="field"><input class="br" id="br' + i + '" type="number" step="0.1" min="0" inputmode="decimal" aria-label="比例" value="' + r2(b.ratio * 100) + '"><span class="unit">%</span></span>' +
+        '<button type="button" class="ghost" data-del="' + i + '" aria-label="刪除">刪除</button>';
+      box.appendChild(d);
+    });
+  }
+
+  function renderFloors() {
+    var tb = $("floors"); tb.innerHTML = "";
+    (state.floors || []).forEach(function (f, i) {
+      var tr = document.createElement("tr");
+      var cell = function (cls, v, type) {
+        return '<td><input class="' + cls + '" id="fl' + i + cls + '" ' + (type ? 'type="number" step="0.01" min="0" inputmode="decimal"' : "") +
+          ' aria-label="' + cls + '" value="' + esc(v === undefined ? "" : v) + '"></td>';
+      };
+      tr.innerHTML = cell("name", f.name) + cell("a0", f.floor_area_m2, 1) + cell("bal", f.balcony_m2, 1) +
+        cell("lob", f.lobby_m2, 1) + cell("oth", f.other_exempt_m2, 1) +
+        '<td><button type="button" class="ghost" data-delfloor="' + i + '" aria-label="刪除樓層">✕</button></td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  function renderAssume() {
+    var box = $("assume"); box.innerHTML = "";
+    var P = RULES.assumptions.params, over = state.assumptions || {};
+    Object.keys(P).forEach(function (k) {
+      var f = ASSUME_FMT[k] || "", pct = f === "pct";
+      var v = k in over ? over[k] : P[k].value;
+      var l = document.createElement("label");
+      l.innerHTML = esc(P[k].label) + '<span class="field"><input id="as-' + k + '" data-key="' + k + '" type="number" step="any" inputmode="decimal" value="' +
+        r2(pct ? v * 100 : v) + '"><span class="unit">' + (pct ? "%" : esc(f)) + "</span></span>";
+      box.appendChild(l);
+    });
+    var n = Object.keys(over).length;
+    $("assume-changed").textContent = n ? "（已調整 " + n + " 項）" : "（使用預設）";
+  }
+
+  // ---------- 結果 ----------
+  var lastTSV = "";
+  function render() {
+    readForm(); save();
+    $("area-ping").textContent = state.site.area_m2 ? "＝ " + fmt(state.site.area_m2 * PING) + " 坪" : "";
+    var rules = E.loadRules(RULES, state.city);
+    $("excav-hint").textContent = rules.excavation_tiers ? "預設：" + rules.excavation_tiers.label : "這個縣市還沒有開挖率規則，有地下室就要填。";
+    var n = Object.keys(state.assumptions || {}).length;
+    $("assume-changed").textContent = n ? "（已調整 " + n + " 項）" : "（使用預設）";
+
+    var out = $("out"), html = [], tsv = [];
+    var res;
+    try { res = E.compute(RULES, state); }
+    catch (e) { out.innerHTML = '<p class="err">' + esc(e.message) + "</p>"; return; }
+    var m = res.model, v = function (k) { return m.value(k); }, T = res.tables;
+
+    html.push('<div class="chips" aria-label="可做的表">' + res.status.map(function (s) {
+      return '<span class="chip ' + (s[1] ? "on" : "off") + '" title="' + esc(s[2]) + '">' + (s[1] ? "✓ " : "— ") + E.TABLES[s[0]] +
+        (s[1] ? "" : "：" + esc(s[2])) + "</span>";
+    }).join("") + "</div>");
+
+    if (T.site) {
+      html.push('<div class="tiles">' +
+        tile("允建容積", fmt(v("allowed") * PING), "坪", fmt(v("allowed")) + " ㎡ · 容積率 " + fmt(v("far_effective") * 100, 1) + "%") +
+        tile("銷售坪數", fmt(v("sales_ping")), "坪", "係數法 " + fmt(v("sales_ping_factor")) + " 坪") +
+        tile("預計戶數", fmt(v("units"), 0), "戶", "每戶 " + fmt(m.value("unit_size_ping"), 1) + " 坪") +
+        tile("車位", fmt(v("planned_parking"), 0), "輛", "法定 " + fmt(v("legal_parking"), 1) + " 輛") +
+        "</div>");
+      var rows = T.site.map(function (r) {
+        var val = v(r[0]);
+        var isPct = r[3] === "" ;
+        var strong = ["allowed", "above", "sales_ping", "permit_area"].indexOf(r[0]) >= 0;
+        return "<tr" + (strong ? ' class="strong"' : "") + "><td>" + esc(r[1]) + '</td><td class="n">' +
+          (isPct ? fmt(val * 100) + "%" : fmt(val, r[3] === "輛" || r[3] === "戶" ? (Number.isInteger(val) ? 0 : 2) : 2)) +
+          '</td><td>' + esc(isPct ? "" : r[3]) + '</td><td class="n">' + (r[4] ? fmt(val * PING) : "") + '</td><td class="f">' + esc(r[2]) + "</td></tr>";
+      });
+      html.push(sheet("可建量試算", "公式欄的 {名稱} 對應本表其他列或下方參數", "<table class=\"t\"><thead><tr><th>項目</th><th>㎡ / 數值</th><th>單位</th><th>坪</th><th>算式</th></tr></thead><tbody>" + rows.join("") + "</tbody></table>"));
+      tsv.push("可建量試算", "項目\t㎡/數值\t單位\t坪");
+      T.site.forEach(function (r) { tsv.push([r[1], v(r[0]), r[3], r[4] ? v(r[0]) * PING : ""].join("\t")); });
+      tsv.push("");
+    }
+
+    if (T.coverage) {
+      var ok = v("cov_result") === "符合";
+      html.push(sheet("建蔽率檢討", "", '<table class="t"><tbody>' +
+        "<tr><td>使用基地面積</td><td class=\"n\">" + fmt(v("usable")) + " ㎡</td></tr>" +
+        "<tr><td>法定建築面積（" + fmt(v("coverage") * 100, 1) + "%）</td><td class=\"n\">" + fmt(v("cov_legal")) + " ㎡</td></tr>" +
+        "<tr><td>設計建築面積</td><td class=\"n\">" + fmt(v("cov_design")) + " ㎡</td></tr>" +
+        "<tr class=\"strong\"><td>設計建蔽率</td><td class=\"n\">" + fmt(v("cov_ratio") * 100) + "% " +
+        '<span class="pill ' + (ok ? "ok" : "bad") + '">' + v("cov_result") + "</span></td></tr></tbody></table>"));
+      tsv.push("建蔽率檢討", "使用基地面積\t" + v("usable"), "法定建築面積\t" + v("cov_legal"), "設計建築面積\t" + v("cov_design"),
+        "設計建蔽率\t" + v("cov_ratio"), "判定\t" + v("cov_result"), "");
+    }
+
+    if (T.floors) {
+      var cols = T.floorCols;
+      var head = "<tr><th>樓層</th>" + cols.map(function (c) { return "<th>" + esc(c[1]) + "</th>"; }).join("") + "</tr>";
+      var body = T.floors.map(function (f, i) {
+        return "<tr><td>" + esc(f.name) + "</td>" + cols.map(function (c) {
+          var x = v("f" + i + "_" + c[0]);
+          return '<td class="n' + (c[0] === "C" && x > 1e-9 ? " c-pos" : "") + '">' + fmt(x) + "</td>";
+        }).join("") + "</tr>";
+      }).join("");
+      html.push(sheet("各層容積檢討", "陽台 ≤ 1/8、梯廳 ≤ 10%、兩者合計 ≤ 15%（以該層樓地板面積計），超過部分 (C) 回計容積",
+        '<table class="t"><thead>' + head + "</thead><tbody>" + body + "</tbody></table>"));
+      tsv.push("各層容積檢討", ["樓層"].concat(cols.map(function (c) { return c[1]; })).join("\t"));
+      T.floors.forEach(function (f, i) { tsv.push([f.name].concat(cols.map(function (c) { return v("f" + i + "_" + c[0]); })).join("\t")); });
+      tsv.push("");
+    }
+
+    if (T.summary) {
+      var sc = [["a0", "樓地板面積"], ["bal", "陽台"], ["lob", "梯廳"], ["oth", "其他免計"], ["vol", "容積樓地板面積"]];
+      var ok2 = v("sum_result") === "符合";
+      var b2 = state.floors.map(function (f, i) {
+        return "<tr><td>" + esc(f.name) + "</td>" + sc.map(function (c) { return '<td class="n">' + fmt(v("f" + i + "_" + c[0])) + "</td>"; }).join("") + "</tr>";
+      }).join("") + '<tr class="total"><td>合計</td>' + sc.map(function (c) { return '<td class="n">' + fmt(v("sum_" + c[0])) + "</td>"; }).join("") + "</tr>";
+      html.push(sheet("各層樓地板面積總表", "",
+        '<table class="t"><thead><tr><th>樓層</th>' + sc.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "</tr></thead><tbody>" + b2 + "</tbody></table>" +
+        '<table class="t"><tbody><tr><td>允建容積樓地板面積</td><td class="n">' + fmt(v("allowed")) + " ㎡</td></tr>" +
+        '<tr class="strong"><td>餘裕（允建 − 各層合計）</td><td class="n">' + fmt(v("sum_diff")) + " ㎡ " +
+        '<span class="pill ' + (ok2 ? "ok" : "bad") + '">' + v("sum_result") + "</span></td></tr></tbody></table>"));
+      tsv.push("各層樓地板面積總表", ["樓層"].concat(sc.map(function (c) { return c[1]; })).join("\t"));
+      state.floors.forEach(function (f, i) { tsv.push([f.name].concat(sc.map(function (c) { return v("f" + i + "_" + c[0]); })).join("\t")); });
+      tsv.push(["合計"].concat(sc.map(function (c) { return v("sum_" + c[0]); })).join("\t"), "允建容積\t" + v("allowed"), "判定\t" + v("sum_result"), "");
+    }
+
+    if (!T.site && !T.floors) html.push('<p class="empty">先填基地面積、建蔽率、容積率；有地下室時，臺北市和桃園市要填開挖率。</p>');
+
+    var prows = res.params.map(function (p) {
+      var val = m.value(p.key);
+      return "<tr><td>" + esc(p.label) + '</td><td class="n">' + (typeof val === "number" ? r2(val) : "") + '</td><td style="text-align:left;white-space:normal">' + esc(p.source || "") +
+        "</td><td>" + (p.status ? '<span class="pill warn">' + esc(p.status) + "</span>" : "") + "</td></tr>";
+    }).join("");
+    html.push(sheet("參數與法源", "", '<table class="t"><thead><tr><th>項目</th><th>數值</th><th style="text-align:left">來源</th><th>狀態</th></tr></thead><tbody>' + prows + "</tbody></table>"));
+
+    out.innerHTML = html.join("");
+    lastTSV = (state.name ? state.name + "\n\n" : "") + tsv.join("\n");
+  }
+
+  function tile(k, v, u, s) {
+    return '<div class="tile"><div class="k">' + k + '</div><div class="v">' + v + '<span class="u">' + u + '</span></div><div class="s">' + s + "</div></div>";
+  }
+  function sheet(title, note, body) {
+    return '<section class="sheet"><header><h2>' + title + "</h2>" + (note ? '<span class="note">' + esc(note) + "</span>" : "") +
+      '</header><div class="scroll">' + body + "</div></section>";
+  }
+
+  // ---------- 動作 ----------
+  var tt;
+  function toast(msg) { var t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(tt); tt = setTimeout(function () { t.hidden = true; }, 2200); }
+  function copy(text, done, box) {
+    var fallback = function () {
+      $("paste-box").hidden = false; $("paste-text").value = text; $("paste-text").select();
+      $("paste-err").hidden = false; $("paste-err").textContent = "無法自動複製，文字已選取，請按 Ctrl+C / ⌘C。";
+    };
+    try { navigator.clipboard.writeText(text).then(function () { toast(done); }, fallback); } catch (e) { fallback(); }
+  }
+  function caseJSON() { readForm(); return JSON.stringify(state, null, 2); }
+
+  $("f").addEventListener("input", render);
+  $("f").addEventListener("submit", function (e) { e.preventDefault(); });
+  $("add-bonus").addEventListener("click", function () { readForm(); state.bonuses.push({ name: "獎勵", ratio: 0 }); renderBonuses(); render(); });
+  $("bonuses").addEventListener("click", function (e) {
+    var i = e.target.dataset.del; if (i === undefined) return;
+    readForm(); state.bonuses.splice(+i, 1); renderBonuses(); render();
+  });
+  $("add-floor").addEventListener("click", function () {
+    readForm(); state.floors.push({ name: (state.floors.length + 1) + "F", floor_area_m2: 0, balcony_m2: 0, lobby_m2: 0, other_exempt_m2: 0 });
+    renderFloors(); render();
+  });
+  $("dup-floor").addEventListener("click", function () {
+    readForm(); var last = state.floors[state.floors.length - 1];
+    var copyF = last ? Object.assign({}, last, { name: (state.floors.length + 1) + "F" }) : { name: "1F", floor_area_m2: 0 };
+    state.floors.push(copyF); renderFloors(); render();
+  });
+  $("floors").addEventListener("click", function (e) {
+    var i = e.target.dataset.delfloor; if (i === undefined) return;
+    readForm(); state.floors.splice(+i, 1); renderFloors(); render();
+  });
+  $("assume-reset").addEventListener("click", function () { readForm(); delete state.assumptions; renderAssume(); render(); });
+  $("btn-sample").addEventListener("click", function () { state = JSON.parse(JSON.stringify(SAMPLE)); fillForm(); render(); toast("已載入範例（數字為虛構）"); });
+  $("btn-copy-tables").addEventListener("click", function () { copy(lastTSV, "已複製，可直接貼到 Excel 或 Google 試算表"); });
+  $("btn-copy-case").addEventListener("click", function () { copy(caseJSON(), "已複製案件檔，貼給 Claude 的 /table-area 可產出有公式的 Excel"); });
+  $("btn-download-case").addEventListener("click", function () {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([caseJSON()], { type: "application/json" }));
+    a.download = (state.name || "案件") + ".json"; a.click();
+  });
+  $("btn-paste-case").addEventListener("click", function () { $("paste-box").hidden = false; $("paste-err").hidden = true; $("paste-text").value = ""; $("paste-text").focus(); });
+  $("paste-cancel").addEventListener("click", function () { $("paste-box").hidden = true; });
+  $("paste-ok").addEventListener("click", function () {
+    try {
+      var c = JSON.parse($("paste-text").value);
+      if (!c.site || !c.site.area_m2) throw new Error("缺少 site.area_m2（基地面積）");
+      c.bonuses = c.bonuses || []; c.floors = c.floors || [];
+      state = c; fillForm(); render(); $("paste-box").hidden = true; toast("已套用案件檔");
+    } catch (e) { $("paste-err").hidden = false; $("paste-err").textContent = "無法讀取：" + e.message; }
+  });
+
+  state = load();
+  state.bonuses = state.bonuses || []; state.floors = state.floors || [];
+  fillForm(); render();
+})();
+</script>
+</body>
+
+</html>

@@ -1,5 +1,5 @@
 {
-  "name": "前期規劃經驗值（非法規，可在案件檔 assumptions 覆寫）",
+  "name": "前期經驗值（非法規，可覆寫）",
   "params": {
     "mech_ratio":          {"value": 0.15, "label": "機電及梯間免計比例（允建容積，不含騎樓）"},
     "mech_indoor_share":   {"value": 0,    "label": "機電設備空間計入比例（室內）"},

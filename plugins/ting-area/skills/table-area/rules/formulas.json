@@ -1,0 +1,50 @@
+{
+  "_說明": "所有表格的算式。{key} 指向參數或其他列；Python 引擎與網頁計算器共用這一份。@BONUS_SUM@ 會換成各獎勵列相加，沒有獎勵時為 0。",
+  "site_head": [
+    ["usable", "使用基地面積", "{site_area}-{reserved}", "㎡", true],
+    ["bldg_area", "法定建築面積", "{usable}*{coverage}", "㎡", true],
+    ["base_far", "基準容積樓地板面積", "{usable}*{far}", "㎡", true]
+  ],
+  "site_bonus": ["bonus_@I@", "@NAME@", "{base_far}*{bonus_ratio_@I@}", "㎡", true],
+  "site_tail": [
+    ["far_total", "基準＋獎勵＋容移", "{base_far}+@BONUS_SUM@", "㎡", true],
+    ["allowed", "允建容積樓地板面積（含騎樓）", "{arcade}+{far_total}", "㎡", true],
+    ["far_effective", "實際容積率", "{far_total}/{usable}", "", false],
+    ["mech_indoor", "機電設備空間", "{far_total}*{mech_ratio}*{mech_indoor_share}", "㎡", true],
+    ["stair_mech", "樓電梯間及其他設備", "{far_total}*{mech_ratio}*{mech_other_share}", "㎡", true],
+    ["above", "地上樓地板面積（含梯廳）", "({allowed}+{mech_indoor}+{stair_mech})/(1-{lobby_share})", "㎡", true],
+    ["balcony", "陽台面積", "{above}*{balcony_share}", "㎡", true],
+    ["lobby", "梯廳面積", "{above}*{lobby_share}", "㎡", true],
+    ["rooftop", "屋突面積", "{bldg_area}*{rooftop_ratio}*{rooftop_floors}", "㎡", true],
+    ["canopy", "外皮雨遮", "({allowed}+{mech_indoor})*{canopy_share}", "㎡", true],
+    ["basement", "地下室樓地板面積", "{usable}*{excav_ratio}*{basement_floors}", "㎡", true],
+    ["permit_area", "建照申請面積", "{above}+{rooftop}+{basement}+{balcony}", "㎡", true],
+    ["total_area", "總面積（含雨遮）", "{above}+{balcony}+{canopy}+{rooftop}+{basement}", "㎡", true],
+    ["sales_m2", "銷售面積（公設比法）", "({allowed}+{mech_indoor}+{balcony}+{canopy})/(1-{public_ratio})", "㎡", true],
+    ["sales_ping", "銷售坪數（公設比法）", "ROUND({sales_m2}*0.3025,2)", "坪", false],
+    ["sales_ping_factor", "銷售坪數（係數法，交叉比對）", "{allowed}*0.3025*{sales_factor}", "坪", false],
+    ["units", "預計戶數", "ROUND({sales_ping}/{unit_size_ping},0)", "戶", false],
+    ["legal_parking", "法定汽車位", "({allowed}+{stair_mech}+{lobby}+{rooftop})/{parking_m2_per_car}", "輛", false],
+    ["planned_parking", "地下室可規劃車位", "INT({basement}*0.3025/{parking_ping_per_space})", "輛", false]
+  ],
+  "coverage": [
+    ["usable", "使用基地面積", null, "㎡", true],
+    ["cov_legal", "法定建築面積", "{usable}*{coverage}", "㎡", true],
+    ["cov_design", "設計建築面積", null, "㎡", true],
+    ["cov_ratio", "設計建蔽率", "{cov_design}/{usable}", "", false],
+    ["cov_result", "判定", "IF({cov_design}<={cov_legal},\"符合\",\"超過\")", "", false]
+  ],
+  "floor": [
+    ["a0", "樓地板面積（不含陽台）", null],
+    ["bal", "陽台", null],
+    ["lob", "梯廳", null],
+    ["oth", "其他免計（樓梯間、機電等）", null],
+    ["A", "(A) 該層面積（含陽台）", "{%a0}+{%bal}"],
+    ["bal_cap", "陽台上限 1/8", "{%a0}*{balcony_cap_ratio}"],
+    ["lob_cap", "梯廳上限 10%", "{%a0}*{lobby_cap_ratio}"],
+    ["comb_cap", "合計上限 15%", "{%a0}*{balcony_lobby_cap_ratio}"],
+    ["B", "(B) 申請免計", "{%bal}+{%lob}+{%oth}"],
+    ["C", "(C) 超過上限回計", "{%bal}+{%lob}-MIN(MIN({%bal},{%bal_cap})+MIN({%lob},{%lob_cap}),{%comb_cap})"],
+    ["vol", "容積樓地板面積 (A)-(B)+(C)", "{%A}-{%B}+{%C}"]
+  ]
+}

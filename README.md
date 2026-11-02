@@ -9,7 +9,16 @@
 | 各層容積檢討 | 每層陽台 1/8、梯廳 10%、合計 15% 上限，(A)−(B)+(C) |
 | 各層樓地板面積總表 | 各層彙總，與允建容積比較 |
 
-## 安裝
+## 網頁版（自己 key 數字）
+
+`docs/index.html` 是單一檔案的試算網頁：左邊填基地、獎勵、各層面積，右邊即時算出四張表。資料只存在你自己的瀏覽器。
+
+- 開 GitHub Pages：repo 的 Settings → Pages → Source 選 `Deploy from a branch`，分支 `main`、資料夾 `/docs`。之後網址是 `https://aj5d.github.io/ting/`。
+- 「複製全部表格」可直接貼進 Excel 或 Google 試算表；「複製案件檔」貼給 Claude 的 `/table-area`，可以產出有公式的 Excel。
+- 網頁和 `/table-area` 讀同一份 `rules/*.json`，算式也共用 `rules/formulas.json`，測試會逐格比對兩邊結果。改了規則檔後執行 `python web/build.py` 重新產生網頁。
+
+## Claude 外掛
+
 
 在 Claude Code 或 Claude 桌面版：
 
@@ -41,9 +50,10 @@ python plugins/ting-area/skills/table-area/scripts/tingarea.py build plugins/tin
 
 ```
 python tests/test_tingarea.py
+python tests/test_web_engine.py
 ```
 
-會用 LibreOffice 重算產出的 Excel，確認每一格公式的結果都跟引擎一致。
+第一個用 LibreOffice 重算產出的 Excel，確認每一格公式的結果都跟引擎一致；第二個用 node 跑網頁引擎，和 Python 引擎逐格比對，並確認 `docs/index.html` 是最新的。
 
 ## 個案資料
 

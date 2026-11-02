@@ -153,75 +153,30 @@ def build_model(case):
         m.expr("excav_ratio", excavation_formula(r["value"]))
         params.append(("excav_ratio", r["label"], "", r["source"], r.get("status")))
     else:
-        m.const("excav_ratio", None)
+        m.const("excav_ratio", 0)  # check() 會擋下需要開挖率的表
     return m, params, bonuses
 
 
 # ---------- 各張表的版面 ----------
+# 算式都在 rules/formulas.json（網頁計算器共用同一份）。
 # 每列：(key, 標題, 算式 或 None 表示引用既有 key, 單位, 是否換算坪)
 
+FORMULAS = json.loads((RULES_DIR / "formulas.json").read_text(encoding="utf-8"))
+COVERAGE_ROWS = [tuple(r) for r in FORMULAS["coverage"]]
+FLOOR_COLS = [tuple(r) for r in FORMULAS["floor"]]  # (後綴, 欄名, 算式)
+
+
 def site_rows(bonuses):
-    rows = [
-        ("usable", "使用基地面積", "{site_area}-{reserved}", "㎡", True),
-        ("bldg_area", "法定建築面積", "{usable}*{coverage}", "㎡", True),
-        ("base_far", "基準容積樓地板面積", "{usable}*{far}", "㎡", True),
-    ]
+    rows = [tuple(r) for r in FORMULAS["site_head"]]
     bonus_keys = []
     for i, b in enumerate(bonuses):
-        k = f"bonus_{i}"
-        bonus_keys.append(k)
-        rows.append((k, b["name"], f"{{base_far}}*{{bonus_ratio_{i}}}", "㎡", True))
+        key, _, f, unit, ping = FORMULAS["site_bonus"]
+        rows.append((key.replace("@I@", str(i)), b["name"], f.replace("@I@", str(i)), unit, ping))
+        bonus_keys.append(rows[-1][0])
     bonus_sum = "+".join("{%s}" % k for k in bonus_keys) or "0"
-    rows += [
-        ("far_total", "基準＋獎勵＋容移", f"{{base_far}}+{bonus_sum}", "㎡", True),
-        ("allowed", "允建容積樓地板面積（含騎樓）", "{arcade}+{far_total}", "㎡", True),
-        ("far_effective", "實際容積率", "{far_total}/{usable}", "", False),
-        ("mech_indoor", "機電設備空間", "{far_total}*{mech_ratio}*{mech_indoor_share}", "㎡", True),
-        ("stair_mech", "樓電梯間及其他設備", "{far_total}*{mech_ratio}*{mech_other_share}", "㎡", True),
-        ("above", "地上樓地板面積（含梯廳）",
-         "({allowed}+{mech_indoor}+{stair_mech})/(1-{lobby_share})", "㎡", True),
-        ("balcony", "陽台面積", "{above}*{balcony_share}", "㎡", True),
-        ("lobby", "梯廳面積", "{above}*{lobby_share}", "㎡", True),
-        ("rooftop", "屋突面積", "{bldg_area}*{rooftop_ratio}*{rooftop_floors}", "㎡", True),
-        ("canopy", "外皮雨遮", "({allowed}+{mech_indoor})*{canopy_share}", "㎡", True),
-        ("basement", "地下室樓地板面積", "{usable}*{excav_ratio}*{basement_floors}", "㎡", True),
-        ("permit_area", "建照申請面積", "{above}+{rooftop}+{basement}+{balcony}", "㎡", True),
-        ("total_area", "總面積（含雨遮）", "{above}+{balcony}+{canopy}+{rooftop}+{basement}", "㎡", True),
-        ("sales_m2", "銷售面積（公設比法）",
-         "({allowed}+{mech_indoor}+{balcony}+{canopy})/(1-{public_ratio})", "㎡", True),
-        ("sales_ping", "銷售坪數（公設比法）", "ROUND({sales_m2}*%s,2)" % PING, "坪", False),
-        ("sales_ping_factor", "銷售坪數（係數法，交叉比對）", "{allowed}*%s*{sales_factor}" % PING, "坪", False),
-        ("units", "預計戶數", "ROUND({sales_ping}/{unit_size_ping},0)", "戶", False),
-        ("legal_parking", "法定汽車位",
-         "({allowed}+{stair_mech}+{lobby}+{rooftop})/{parking_m2_per_car}", "輛", False),
-        ("planned_parking", "地下室可規劃車位",
-         "INT({basement}*%s/{parking_ping_per_space})" % PING, "輛", False),
-    ]
+    for key, label, f, unit, ping in FORMULAS["site_tail"]:
+        rows.append((key, label, f.replace("@BONUS_SUM@", bonus_sum), unit, ping))
     return rows
-
-
-COVERAGE_ROWS = [
-    ("usable", "使用基地面積", None, "㎡", True),
-    ("cov_legal", "法定建築面積", "{usable}*{coverage}", "㎡", True),
-    ("cov_design", "設計建築面積", None, "㎡", True),
-    ("cov_ratio", "設計建蔽率", "{cov_design}/{usable}", "", False),
-    ("cov_result", "判定", 'IF({cov_design}<={cov_legal},"符合","超過")', "", False),
-]
-
-FLOOR_COLS = [  # (後綴, 欄名, 算式)
-    ("a0", "樓地板面積（不含陽台）", None),
-    ("bal", "陽台", None),
-    ("lob", "梯廳", None),
-    ("oth", "其他免計（樓梯間、機電等）", None),
-    ("A", "(A) 該層面積（含陽台）", "{%a0}+{%bal}"),
-    ("bal_cap", "陽台上限 1/8", "{%a0}*{balcony_cap_ratio}"),
-    ("lob_cap", "梯廳上限 10%", "{%a0}*{lobby_cap_ratio}"),
-    ("comb_cap", "合計上限 15%", "{%a0}*{balcony_lobby_cap_ratio}"),
-    ("B", "(B) 申請免計", "{%bal}+{%lob}+{%oth}"),
-    ("C", "(C) 超過上限回計",
-     "{%bal}+{%lob}-MIN(MIN({%bal},{%bal_cap})+MIN({%lob},{%lob_cap}),{%comb_cap})"),
-    ("vol", "容積樓地板面積 (A)-(B)+(C)", "{%A}-{%B}+{%C}"),
-]
 
 
 # ---------- 檢查與輸出 ----------
@@ -229,14 +184,22 @@ FLOOR_COLS = [  # (後綴, 欄名, 算式)
 def check(case):
     """回傳 [(table, 可否, 說明)]"""
     floors = case.get("floors") or []
-    out = [("site", True, "基地面積、容積率、建蔽率齊全")]
-    if case.get("building_area_m2"):
+    basement = case.get("basement") or {}
+    no_excav = (basement.get("floors", 0) > 0 and basement.get("excavation_ratio") is None
+                and "excavation_tiers" not in load_rules(case.get("city")))
+    if no_excav:
+        out = [("site", False, "這個縣市還沒有開挖率規則，請填 basement.excavation_ratio")]
+    else:
+        out = [("site", True, "基地面積、容積率、建蔽率齊全")]
+    if case.get("building_area_m2") and no_excav:
+        out.append(("coverage", False, "可建量試算做不出來"))
+    elif case.get("building_area_m2"):
         out.append(("coverage", True, "有設計建築面積"))
     else:
         out.append(("coverage", False, "缺 building_area_m2（設計建築面積）"))
     if floors:
         out.append(("per-floor-volume", True, f"{len(floors)} 層資料，每層一張"))
-        out.append(("summary", True, "全案一張"))
+        out.append(("summary", not no_excav, "全案一張" if not no_excav else "可建量試算做不出來"))
     else:
         out.append(("per-floor-volume", False, "缺 floors（各層面積）"))
         out.append(("summary", False, "缺 floors（各層面積）"))
