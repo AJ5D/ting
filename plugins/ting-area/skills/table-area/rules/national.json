@@ -1,0 +1,35 @@
+{
+  "name": "全國（建築技術規則）",
+  "params": {
+    "balcony_cap_ratio": {
+      "value": 0.125,
+      "label": "陽台免計上限（該層樓地板面積比例）",
+      "source": "建築技術規則建築設計施工編 第162條",
+      "status": "待建築師核對"
+    },
+    "lobby_cap_ratio": {
+      "value": 0.10,
+      "label": "梯廳免計上限（該層樓地板面積比例）",
+      "source": "建築技術規則建築設計施工編 第162條",
+      "status": "待建築師核對"
+    },
+    "balcony_lobby_cap_ratio": {
+      "value": 0.15,
+      "label": "陽台＋梯廳合計免計上限（該層樓地板面積比例）",
+      "source": "建築技術規則建築設計施工編 第162條",
+      "status": "待建築師核對"
+    },
+    "rooftop_ratio": {
+      "value": 0.125,
+      "label": "屋突每層面積上限（建築面積比例）",
+      "source": "建築技術規則建築設計施工編 第1條第10款",
+      "status": "待建築師核對"
+    },
+    "rooftop_max_floors": {
+      "value": 3,
+      "label": "屋突最多層數",
+      "source": "建築技術規則建築設計施工編 第1條第10款",
+      "status": "待建築師核對"
+    }
+  }
+}

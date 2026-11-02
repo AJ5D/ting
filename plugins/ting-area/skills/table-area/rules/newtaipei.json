@@ -1,0 +1,11 @@
+{
+  "name": "新北市",
+  "params": {
+    "excavation_tiers": {
+      "value": [{"upto": 500, "ratio": 0.7}, {"upto": null, "ratio": 0.6}],
+      "label": "地下開挖率級距（基地前 500㎡ 70%，超過部分 60%）",
+      "source": "沿用林口特定區案試算表；實際依各都市計畫土管要點",
+      "status": "待建築師核對"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "ting",
+  "owner": {
+    "name": "AJ5D"
+  },
+  "metadata": {
+    "description": "Ting 房地產開發工具：面積與容積檢討表"
+  },
+  "plugins": [
+    {
+      "name": "ting-area",
+      "source": "./plugins/ting-area",
+      "description": "面積與容積檢討表：可建量試算、建蔽率檢討、各層容積檢討、樓地板面積總表"
+    }
+  ]
+}

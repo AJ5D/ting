@@ -1,0 +1,5 @@
+{
+  "name": "桃園市",
+  "params": {},
+  "notes": "桃園市各都市計畫土管要點尚未建檔。開挖率請在案件檔的 basement.excavation_ratio 直接指定。"
+}
